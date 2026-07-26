@@ -3,7 +3,83 @@
 :root {
   color-scheme: dark;
 }
+
 body {
   margin: 0;
   min-height: 100vh;
+  background: #02070d;
+}
+
+.dragon-pulse {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(16, 185, 129, 0.12), transparent 18%),
+    radial-gradient(circle at 50% 75%, rgba(37, 99, 235, 0.1), transparent 35%),
+    linear-gradient(180deg, #010409 0%, #03111a 58%, #010308 100%);
+}
+
+.dragon-pulse::before,
+.dragon-pulse::after {
+  position: absolute;
+  inset: -20%;
+  content: '';
+  border-radius: 50%;
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  animation: dragon-sonar 4.5s ease-out infinite;
+}
+
+.dragon-pulse::after {
+  animation-delay: 2.25s;
+}
+
+.dragon-eye {
+  position: absolute;
+  top: 37%;
+  width: clamp(3.5rem, 12vw, 7rem);
+  aspect-ratio: 2 / 1;
+  border-radius: 80% 10% 80% 10%;
+  background: radial-gradient(ellipse at center, #05110d 0 14%, #34d399 17%, #a7f3d0 35%, #10b981 55%, transparent 72%);
+  filter: drop-shadow(0 0 22px rgba(52, 211, 153, 0.95));
+  animation: dragon-blink 7s infinite;
+}
+
+.dragon-eye-left {
+  left: calc(50% - clamp(8rem, 23vw, 14rem));
+  transform: rotate(12deg);
+}
+
+.dragon-eye-right {
+  right: calc(50% - clamp(8rem, 23vw, 14rem));
+  transform: scaleX(-1) rotate(12deg);
+}
+
+@keyframes dragon-sonar {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  20% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes dragon-blink {
+  0%, 45%, 49%, 100% {
+    transform-origin: center;
+    opacity: 1;
+  }
+  47% {
+    opacity: 0.1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dragon-pulse::before,
+  .dragon-pulse::after,
+  .dragon-eye {
+    animation: none;
+  }
 }
