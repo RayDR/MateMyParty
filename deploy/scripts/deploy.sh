@@ -24,6 +24,10 @@ run_as_deployer() {
   runuser --user "${DEPLOY_USER}" -- "$@"
 }
 
+run_git() {
+  run_as_deployer git -C "${REPOSITORY_DIRECTORY}" "$@"
+}
+
 run_pnpm() {
   run_as_deployer /usr/bin/env \
     "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
@@ -45,11 +49,11 @@ requested_ref="$2"
 [[ -x "${NODE_BINARY}" ]] || die "isolated Node.js runtime is not installed"
 [[ -x "${PNPM_BINARY}" ]] || die "isolated pnpm runtime is not installed"
 
-if [[ -n $(git -C "${REPOSITORY_DIRECTORY}" status --porcelain) ]]; then
+if [[ -n $(run_git status --porcelain) ]]; then
   die "repository working tree is not clean"
 fi
 
-run_as_deployer git -C "${REPOSITORY_DIRECTORY}" fetch --prune --tags origin
+run_git fetch --prune --tags origin
 
 case "${requested_ref}" in
   main)
@@ -74,17 +78,17 @@ case "${requested_ref}" in
     ;;
 esac
 
-target_commit="$(git -C "${REPOSITORY_DIRECTORY}" rev-parse --verify "${target_ref}^{commit}")" ||
+target_commit="$(run_git rev-parse --verify "${target_ref}^{commit}")" ||
   die "requested ref does not resolve to a commit"
-git -C "${REPOSITORY_DIRECTORY}" merge-base --is-ancestor \
+run_git merge-base --is-ancestor \
   "${target_commit}" "${allowed_upstream}" ||
   die "requested commit is not part of ${allowed_upstream}"
 
-previous_commit="$(git -C "${REPOSITORY_DIRECTORY}" rev-parse HEAD)"
+previous_commit="$(run_git rev-parse HEAD)"
 install -d -m 0750 -o root -g root "${DEPLOYMENT_STATE_DIRECTORY}"
 printf '%s\n' "${previous_commit}" >"${DEPLOYMENT_STATE_DIRECTORY}/previous-commit"
 
-run_as_deployer git -C "${REPOSITORY_DIRECTORY}" switch --detach "${target_commit}"
+run_git switch --detach "${target_commit}"
 run_pnpm install --frozen-lockfile
 run_pnpm format:check
 run_pnpm lint
@@ -101,6 +105,7 @@ set +a
 runuser --user "${DEPLOY_USER}" --whitelist-environment=DATABASE_URL -- \
   /usr/bin/env "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
   "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" db:migrate
+unset DATABASE_URL HOST_ADMIN_TOKEN
 
 systemctl restart matemyparty-api.service
 for attempt in {1..20}; do
