@@ -1,0 +1,6 @@
+{
+  "extends": "../../packages/typescript-config/nestjs.json",
+  "compilerOptions": { "baseUrl": ".", "outDir": "dist" },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

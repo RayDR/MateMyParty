@@ -1,0 +1,27 @@
+[Unit]
+Description=MateMyParty Next.js web application
+After=network-online.target matemyparty-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=matemyparty
+Group=matemyparty
+WorkingDirectory=/opt/matemyparty
+EnvironmentFile=/etc/matemyparty/matemyparty.env
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env pnpm --filter @matemyparty/web start
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=matemyparty-web
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

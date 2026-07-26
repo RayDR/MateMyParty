@@ -1,0 +1,10 @@
+{
+  "birthday": "Birthday",
+  "date": "Date",
+  "time": "Time",
+  "timezone": "Time zone",
+  "venue": "Venue",
+  "invitationSoon": "The complete invitation will be available soon.",
+  "age": "Turning {age}",
+  "datePending": "To be confirmed"
+}

@@ -1,0 +1,10 @@
+{
+  "platformName": "MateMyParty",
+  "inConstruction": "A better way to create and share meaningful invitations is under construction.",
+  "languageSelector": "Language",
+  "english": "English (US)",
+  "spanish": "Español (México)",
+  "errorTitle": "Something went wrong",
+  "notFound": "This event could not be found.",
+  "tryAgain": "Please try again later."
+}

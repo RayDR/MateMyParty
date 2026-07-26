@@ -1,0 +1,8 @@
+# Repository owner. Replace or expand this list as the team grows.
+* @RayDR
+
+# Security-sensitive and operational changes require explicit owner review.
+/.github/ @RayDR
+/deploy/ @RayDR
+/packages/database/ @RayDR
+/docs/security.md @RayDR

@@ -1,0 +1,10 @@
+{
+  "birthday": "Cumpleaños",
+  "date": "Fecha",
+  "time": "Hora",
+  "timezone": "Zona horaria",
+  "venue": "Lugar",
+  "invitationSoon": "La invitación completa estará disponible pronto.",
+  "age": "Cumple {age}",
+  "datePending": "Por confirmar"
+}
