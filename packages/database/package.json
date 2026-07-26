@@ -21,7 +21,7 @@
   "devDependencies": {
     "@types/node": "22.18.10",
     "@types/pg": "8.15.5",
-    "drizzle-kit": "0.31.5",
+    "drizzle-kit": "0.31.10",
     "tsx": "4.20.6",
     "vitest": "3.2.4"
   }
