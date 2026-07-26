@@ -1,6 +1,7 @@
 import type { PublicInvitation as PublicInvitationData } from '@matemyparty/contracts';
 import { getDictionary } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
+import { DragonInvitationExperience } from './dragon-invitation-experience';
 
 export function PublicInvitation({ invitation }: { invitation: PublicInvitationData }) {
   const dictionary = getDictionary(invitation.locale);
@@ -14,22 +15,28 @@ export function PublicInvitation({ invitation }: { invitation: PublicInvitationD
     timeStyle: 'short',
     timeZone: event.timezone,
   }).format(startsAt);
+
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_50%_0%,#312e81,#0f172a_48%,#020617)] p-5 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-3xl items-center">
+    <DragonInvitationExperience
+      enterLabel={dictionary.invitation.enterDragonWorld}
+      fallbackLabel={dictionary.invitation.fallbackExperience}
+    >
+      <div className="mx-auto flex min-h-screen max-w-3xl items-center p-5">
         <Card>
           <div className="text-center">
-            <p className="text-sm font-bold uppercase tracking-[0.3em] text-cyan-300">
+            <p className="text-sm font-bold uppercase tracking-[0.35em] text-emerald-300">
               {dictionary.event.birthday}
             </p>
-            <h1 className="mt-4 text-4xl font-black sm:text-6xl">{event.title}</h1>
-            <p className="mt-3 text-2xl text-violet-200">{event.celebrantName}</p>
+            <h1 className="mt-4 text-4xl font-black drop-shadow-[0_0_24px_rgba(52,211,153,0.25)] sm:text-6xl">
+              {event.title}
+            </h1>
+            <p className="mt-3 text-2xl text-emerald-100">{event.celebrantName}</p>
             {event.celebrantAge ? (
               <p className="mt-1 text-slate-300">
                 {dictionary.event.age.replace('{age}', String(event.celebrantAge))}
               </p>
             ) : null}
-            <p className="mt-6 rounded-2xl bg-cyan-400/10 p-4 text-lg text-cyan-100">
+            <p className="mt-6 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 text-lg text-emerald-100">
               {dictionary.invitation.preparedFor.replace(
                 '{guestName}',
                 invitation.guestDisplayName,
@@ -48,19 +55,19 @@ export function PublicInvitation({ invitation }: { invitation: PublicInvitationD
           {event.hostMessage ? (
             <p className="mt-8 text-center text-lg text-slate-200">{event.hostMessage}</p>
           ) : null}
-          <p className="mt-8 rounded-2xl bg-violet-500/15 p-4 text-center text-violet-100">
+          <p className="mt-8 rounded-2xl border border-blue-300/15 bg-blue-500/10 p-4 text-center text-blue-100">
             {dictionary.invitation.rsvpSoon}
           </p>
         </Card>
       </div>
-    </main>
+    </DragonInvitationExperience>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <dt className="text-xs font-bold uppercase tracking-wider text-cyan-300">{label}</dt>
+    <div className="rounded-2xl border border-emerald-200/10 bg-black/35 p-4 backdrop-blur-md">
+      <dt className="text-xs font-bold uppercase tracking-wider text-emerald-300">{label}</dt>
       <dd className="mt-2 text-lg text-slate-100">{value}</dd>
     </div>
   );
