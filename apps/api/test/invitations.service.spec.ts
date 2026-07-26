@@ -18,8 +18,10 @@ const guest: GuestRow = {
   phone: null,
   preferredChannel: 'MANUAL',
   locale: 'en-US',
-  adultsPlanned: null,
-  childrenPlanned: null,
+  invitationCountMode: 'TOTAL_ONLY',
+  totalInvited: 4,
+  adultsInvited: null,
+  childrenInvited: null,
   privateNotes: null,
   createdAt: new Date('2026-07-26T00:00:00Z'),
   updatedAt: new Date('2026-07-26T00:00:00Z'),
@@ -67,13 +69,16 @@ const event: EventRow = {
 class MemoryInvitationsRepository {
   invitations: InvitationRow[] = [];
   activities: Array<{ invitationId: string; type: string }> = [];
+  guestArchived = false;
   sequence = 0;
   executor = {} as DatabaseExecutor;
   transaction<T>(operation: (executor: DatabaseExecutor) => Promise<T>) {
     return operation(this.executor);
   }
   async guestById(id: string) {
-    return id === guest.id ? guest : null;
+    return id === guest.id
+      ? { ...guest, archivedAt: this.guestArchived ? new Date() : null }
+      : null;
   }
   async findById(id: string) {
     return this.invitations.find((value) => value.id === id) ?? null;
@@ -115,13 +120,15 @@ class MemoryInvitationsRepository {
     return 'raymundo6th.domoforge.com';
   }
   async candidatesByPrefix(prefix: string) {
+    if (this.guestArchived) return [];
     return this.invitations.filter(
       (value) => value.publicTokenPrefix === prefix && !value.revokedAt,
     );
   }
   async publicDetails(id: string) {
+    if (this.guestArchived) return null;
     const invitation = await this.findById(id);
-    return invitation ? { invitation, guest, event } : null;
+    return invitation ? { invitation, guest, event, localization: null } : null;
   }
   async recordOpen(id: string, now: Date) {
     const row = await this.findById(id);
@@ -163,6 +170,18 @@ describe('InvitationsService lifecycle', () => {
     expect(JSON.stringify(repository.invitations[0])).not.toContain(result.token);
   });
 
+  it('allows only one active invitation per guest', async () => {
+    const { service } = setup();
+    await service.createForGuest(guest.id);
+    await expect(service.createForGuest(guest.id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('does not create invitations for archived guests', async () => {
+    const { repository, service } = setup();
+    repository.guestArchived = true;
+    await expect(service.createForGuest(guest.id)).rejects.toMatchObject({ status: 404 });
+  });
+
   it('tracks first and later openings without changing the first timestamp', async () => {
     const { repository, service } = setup();
     const created = await service.createForGuest(guest.id);
@@ -196,6 +215,14 @@ describe('InvitationsService lifecycle', () => {
     await expect(service.resolveAndTrack(regenerated.newToken, {})).resolves.toMatchObject({
       guestDisplayName: 'Family Sample',
     });
+  });
+
+  it('excludes archived guests from public resolution and regeneration', async () => {
+    const { repository, service } = setup();
+    const created = await service.createForGuest(guest.id);
+    repository.guestArchived = true;
+    await expect(service.resolveAndTrack(created.token, {})).rejects.toMatchObject({ status: 404 });
+    await expect(service.regenerate(created.invitation.id)).rejects.toMatchObject({ status: 404 });
   });
 
   it('revokes idempotently without duplicate activity', async () => {

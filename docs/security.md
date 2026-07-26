@@ -12,6 +12,10 @@ The public contract contains public event presentation, guest display name, invi
 
 Host contracts intentionally include contact and operational data. They are available only through bearer-protected API routes or the temporary server-side web proxy.
 
+Invitation candidate and public-detail queries exclude both revoked invitations and archived guests. Archiving therefore immediately makes an otherwise valid link resolve to the same neutral 404 used for unknown or revoked credentials. Restoring is a protected host action. Creating or regenerating an invitation for an archived guest is rejected.
+
+The host sharing preview contains event-level presentation only. A raw link can exist temporarily in browser memory after creation or regeneration so the host can copy it, but it is never placed in local storage, persisted by the API, recovered from the hash, or included in event metadata. Invalid and revoked routes receive product-level metadata only; every invitation page remains `noindex`.
+
 ## Temporary host protection
 
 `HOST_ADMIN_TOKEN` is a shared development secret, not user authentication. Nest compares it with timing-safe operations. Production startup rejects missing, short, and known example values. The web application never exposes the token to client JavaScript: its access form is handled server-side, a derived HMAC session is stored in an HttpOnly, SameSite=Strict cookie, and Next route handlers attach the API bearer token server-side.

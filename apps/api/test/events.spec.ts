@@ -167,6 +167,24 @@ describe('EventsService', () => {
     },
   );
 
+  it('builds a localized share preview without guest or contact data', async () => {
+    const repository = {
+      findHostRecordByIdentifier: jest.fn().mockResolvedValue(hostRecord),
+    } as unknown as EventsRepository;
+    const preview = await new EventsService(repository).invitationSharePreview(
+      'raymundo-6',
+      'es-MX',
+    );
+    expect(preview).toMatchObject({
+      locale: 'es-MX',
+      eventTitle: 'Sexto cumpleaños de Raymundo',
+      hostname: 'raymundo6th.domoforge.com',
+    });
+    expect(preview.smsText).toContain('https://raymundo6th.domoforge.com/i/…');
+    expect(preview).not.toHaveProperty('guest');
+    expect(preview).not.toHaveProperty('email');
+  });
+
   it('builds dashboard statistics without exposing UUIDs', async () => {
     const repository = {
       listHostRecords: jest.fn().mockResolvedValue([hostRecord]),

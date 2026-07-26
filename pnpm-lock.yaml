@@ -44,6 +44,9 @@ importers:
       '@matemyparty/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@matemyparty/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)

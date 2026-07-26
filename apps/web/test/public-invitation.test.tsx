@@ -30,6 +30,12 @@ const invitation = {
   status: 'OPENED' as const,
   locale: 'en-US' as const,
   openedPreviously: false,
+  shareMetadata: {
+    title: 'Raymundo’s 6th Birthday',
+    description: 'You are invited to Raymundo’s 6th Birthday.',
+    thumbnailImageRef: null,
+    thumbnailAltText: 'Raymundo’s 6th birthday',
+  },
   capabilities: { canRespond: false as const, canAddToCalendar: false as const },
 };
 

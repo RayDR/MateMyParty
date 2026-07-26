@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { HostAdminTokenGuard } from '../auth/host-admin-token.guard';
 import { EventsService } from './events.service';
 
@@ -15,6 +15,11 @@ export class HostEventsController {
   @Get(':identifier')
   detail(@Param('identifier') identifier: string) {
     return this.events.hostEvent(identifier);
+  }
+
+  @Get(':identifier/share-preview')
+  sharePreview(@Param('identifier') identifier: string, @Query('locale') locale?: string) {
+    return this.events.invitationSharePreview(identifier, locale);
   }
 
   @Patch(':identifier')

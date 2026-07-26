@@ -23,6 +23,10 @@ export const eventStatus = pgEnum('event_status', [
 export const eventType = pgEnum('event_type', ['KIDS_BIRTHDAY']);
 export const eventAnimationMode = pgEnum('event_animation_mode', ['NONE', 'SUBTLE', 'IMMERSIVE']);
 export const preferredChannel = pgEnum('preferred_channel', ['EMAIL', 'SMS', 'BOTH', 'MANUAL']);
+export const invitationCountMode = pgEnum('invitation_count_mode', [
+  'TOTAL_ONLY',
+  'ADULTS_AND_CHILDREN',
+]);
 export const invitationStatus = pgEnum('invitation_status', [
   'DRAFT',
   'READY',
@@ -182,8 +186,12 @@ export const guests = pgTable(
     phone: text('phone'),
     preferredChannel: preferredChannel('preferred_channel').notNull(),
     locale: text('locale').notNull(),
-    adultsPlanned: integer('adults_planned'),
-    childrenPlanned: integer('children_planned'),
+    invitationCountMode: invitationCountMode('invitation_count_mode')
+      .notNull()
+      .default('TOTAL_ONLY'),
+    totalInvited: integer('total_invited').notNull().default(0),
+    adultsInvited: integer('adults_invited'),
+    childrenInvited: integer('children_invited'),
     privateNotes: text('private_notes'),
     ...auditColumns,
     archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
@@ -191,12 +199,9 @@ export const guests = pgTable(
   (table) => [
     index('guests_event_id_index').on(table.eventId),
     check(
-      'guests_adults_planned_non_negative',
-      sql`${table.adultsPlanned} is null or ${table.adultsPlanned} >= 0`,
-    ),
-    check(
-      'guests_children_planned_non_negative',
-      sql`${table.childrenPlanned} is null or ${table.childrenPlanned} >= 0`,
+      'guests_invitation_count_consistency',
+      sql`(${table.invitationCountMode} = 'TOTAL_ONLY' and ${table.totalInvited} >= 0 and ${table.adultsInvited} is null and ${table.childrenInvited} is null) or
+          (${table.invitationCountMode} = 'ADULTS_AND_CHILDREN' and ${table.adultsInvited} is not null and ${table.adultsInvited} >= 0 and ${table.childrenInvited} is not null and ${table.childrenInvited} >= 0 and ${table.totalInvited} = ${table.adultsInvited} + ${table.childrenInvited})`,
     ),
     check(
       'guests_preferred_channel_contact_check',

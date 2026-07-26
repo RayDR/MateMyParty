@@ -2,14 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   hostEventDetailSchema,
   hostEventSummarySchema,
+  invitationSharePreviewSchema,
   normalizeHostname,
   normalizeSlug,
   publicEventSchema,
   updateHostEventInputSchema,
   type HostEventDetail,
   type HostEventSummary,
+  type InvitationSharePreview,
   type PublicEvent,
 } from '@matemyparty/contracts';
+import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { ApiError, parseInput } from '../common/api-error';
 import { EventsRepository, type HostEventRecord } from './events.repository';
 
@@ -33,6 +36,32 @@ export class EventsService {
     const record = await this.repository.findHostRecordByIdentifier(identifier);
     if (!record) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
     return this.toHostDetail(record);
+  }
+
+  async invitationSharePreview(
+    identifier: string,
+    requestedLocale?: string,
+  ): Promise<InvitationSharePreview> {
+    const event = await this.hostEvent(identifier);
+    const locale: Locale =
+      requestedLocale === 'en-US' || requestedLocale === 'es-MX'
+        ? requestedLocale
+        : event.defaultLocale;
+    const content = event.localizedContent[locale];
+    const dictionary = getDictionary(locale).invitation;
+    const invitationText = dictionary.shareGeneric.replace('{eventTitle}', content.title);
+    const invitationUrl = event.primaryHostname ? `https://${event.primaryHostname}/i/…` : '/i/…';
+    return invitationSharePreviewSchema.parse({
+      eventTitle: content.title,
+      invitationText,
+      smsText: dictionary.shareSms
+        .replace('{eventTitle}', content.title)
+        .replace('{invitationUrl}', invitationUrl),
+      hostname: event.primaryHostname,
+      thumbnailImageRef: event.thumbnailImageRef,
+      thumbnailAltText: content.thumbnailAltText,
+      locale,
+    });
   }
 
   async updateHostEvent(identifier: string, rawInput: unknown): Promise<HostEventDetail> {
