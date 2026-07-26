@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import {
   eventDomains,
+  eventLocalizations,
   events,
   guests,
   invitationActivities,
@@ -86,19 +87,45 @@ export class InvitationsRepository {
   }
 
   async candidatesByPrefix(prefix: string, executor: DatabaseExecutor) {
-    return executor
-      .select()
+    const rows = await executor
+      .select({ invitation: invitations })
       .from(invitations)
-      .where(and(eq(invitations.publicTokenPrefix, prefix), isNull(invitations.revokedAt)));
+      .innerJoin(guests, eq(guests.id, invitations.guestId))
+      .where(
+        and(
+          eq(invitations.publicTokenPrefix, prefix),
+          isNull(invitations.revokedAt),
+          isNull(guests.archivedAt),
+        ),
+      );
+    return rows.map(({ invitation }) => invitation);
   }
 
   async publicDetails(invitationId: string, executor: DatabaseExecutor) {
     const rows = await executor
-      .select({ invitation: invitations, guest: guests, event: events })
+      .select({
+        invitation: invitations,
+        guest: guests,
+        event: events,
+        localization: eventLocalizations,
+      })
       .from(invitations)
       .innerJoin(guests, eq(guests.id, invitations.guestId))
       .innerJoin(events, eq(events.id, invitations.eventId))
-      .where(eq(invitations.id, invitationId))
+      .leftJoin(
+        eventLocalizations,
+        and(
+          eq(eventLocalizations.eventId, events.id),
+          eq(eventLocalizations.locale, invitations.locale),
+        ),
+      )
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          isNull(invitations.revokedAt),
+          isNull(guests.archivedAt),
+        ),
+      )
       .limit(1);
     return rows[0] ?? null;
   }

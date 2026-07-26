@@ -27,6 +27,11 @@ export class GuestsController {
     return this.guests.list(eventIdentifier, includeArchived);
   }
 
+  @Get('events/:eventId/guest-statistics')
+  statistics(@Param('eventId') eventIdentifier: string) {
+    return this.guests.statistics(eventIdentifier);
+  }
+
   @Post('events/:eventId/guests')
   create(@Param('eventId') eventIdentifier: string, @Body() body: unknown) {
     return this.guests.create(eventIdentifier, body);
@@ -40,5 +45,10 @@ export class GuestsController {
   @Post('guests/:guestId/archive')
   archive(@Param('guestId', new ParseUUIDPipe()) guestId: string) {
     return this.guests.archive(guestId);
+  }
+
+  @Post('guests/:guestId/restore')
+  restore(@Param('guestId', new ParseUUIDPipe()) guestId: string) {
+    return this.guests.restore(guestId);
   }
 }

@@ -9,6 +9,7 @@ import {
   type RegenerateInvitationResult,
 } from '@matemyparty/contracts';
 import type { DatabaseExecutor, guests } from '@matemyparty/database';
+import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { ApiError } from '../common/api-error';
 import { presentGuest, presentInvitation } from '../guests/guest.presenter';
 import { InvitationTokenService } from './invitation-token.service';
@@ -80,7 +81,7 @@ export class InvitationsService {
         await this.repository.addActivity(previous.id, 'REVOKED', null, executor);
       }
       const guest = await this.repository.guestById(previous.guestId, executor);
-      if (!guest) throw new ApiError(404, 'GUEST_NOT_FOUND', 'Guest not found');
+      if (!guest || guest.archivedAt) throw new ApiError(404, 'GUEST_NOT_FOUND', 'Guest not found');
       const created = await this.createForGuestInTransaction(guest, executor, 'REGENERATED');
       return regenerateInvitationResultSchema.parse({
         invitation: created.invitation,
@@ -119,6 +120,9 @@ export class InvitationsService {
       if (!opened) throw this.publicNotFound();
       await this.repository.addActivity(invitation.id, 'OPENED', metadata, executor);
       const event = details.event;
+      const locale: Locale = opened.locale === 'es-MX' ? 'es-MX' : 'en-US';
+      const localizedTitle = details.localization?.title ?? event.title;
+      const thumbnailAltText = details.localization?.thumbnailAltText ?? localizedTitle;
       return publicInvitationSchema.parse({
         event: publicEventSchema.parse({
           ...event,
@@ -130,6 +134,15 @@ export class InvitationsService {
         status: opened.status,
         locale: opened.locale,
         openedPreviously,
+        shareMetadata: {
+          title: localizedTitle,
+          description: getDictionary(locale).invitation.shareGeneric.replace(
+            '{eventTitle}',
+            localizedTitle,
+          ),
+          thumbnailImageRef: event.thumbnailImageRef,
+          thumbnailAltText,
+        },
         capabilities: { canRespond: false, canAddToCalendar: false },
       });
     });

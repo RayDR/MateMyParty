@@ -3,5 +3,7 @@
   "preparedFor": "Esta invitación fue preparada para {guestName}.",
   "rsvpSoon": "La confirmación de asistencia estará disponible pronto.",
   "invalidTitle": "Esta invitación no está disponible",
-  "invalidMessage": "Es posible que el enlace no sea válido, haya vencido o ya no esté activo."
+  "invalidMessage": "Es posible que el enlace no sea válido, haya vencido o ya no esté activo.",
+  "shareGeneric": "Estás invitado a {eventTitle}. Abre tu invitación privada para ver los detalles.",
+  "shareSms": "¡Estás invitado a {eventTitle}! Abre tu invitación privada: {invitationUrl}"
 }

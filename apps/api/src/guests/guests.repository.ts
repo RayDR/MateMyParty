@@ -74,6 +74,16 @@ export class GuestsRepository {
     return rows[0] ?? this.findById(guestId, true, executor);
   }
 
+  async restore(guestId: string, executor: DatabaseExecutor) {
+    const now = new Date();
+    const rows = await executor
+      .update(guests)
+      .set({ archivedAt: null, updatedAt: now })
+      .where(and(eq(guests.id, guestId), isNotNull(guests.archivedAt)))
+      .returning();
+    return rows[0] ?? this.findById(guestId, true, executor);
+  }
+
   async list(eventId: string, includeArchived: boolean) {
     const conditions = [eq(guests.eventId, eventId)];
     conditions.push(includeArchived ? isNotNull(guests.id) : isNull(guests.archivedAt));

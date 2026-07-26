@@ -22,6 +22,13 @@
       "when": 1785105591572,
       "tag": "0002_careful_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785107382490,
+      "tag": "0003_regular_the_order",
+      "breakpoints": true
     }
   ]
 }

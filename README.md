@@ -52,10 +52,10 @@ pnpm dev
 
 Open `http://localhost:3000` for the product landing and `http://localhost:3000/events/raymundo-6` for the seeded event. The API is at `http://localhost:3001`; health is `GET /health`.
 
-The temporary host panel for the seeded event is:
+The temporary host panel for the seeded event uses its public slug (the random public code also works):
 
 ```text
-http://localhost:3000/host/events/22222222-2222-4222-8222-222222222222/guests
+http://localhost:3000/host/events/raymundo-6/guests
 ```
 
 Enter `HOST_ADMIN_TOKEN` at the access screen. The server validates it and sets a derived HttpOnly, SameSite=Strict session cookie; browser JavaScript never receives the API secret. This mechanism is provisional and must be replaced by real user authentication and event authorization.
@@ -71,7 +71,7 @@ For a browser, add `127.0.0.1 raymundo6th.domoforge.com matemyparty.domoforge.co
 
 ## Database workflow
 
-`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for guests, invitations, activity, enums, checks, and the partial active-invitation index. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
+`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle and `0003_regular_the_order.sql` for explicit total-only or adult/child invitation counts. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
 
 Optional non-personal sample guests are inserted only when explicitly requested:
 
@@ -86,13 +86,13 @@ Address fields and `endsAt` are nullable because those facts are not yet known. 
 Private host endpoints require the bearer token. Create a MANUAL guest:
 
 ```bash
-export EVENT_ID=22222222-2222-4222-8222-222222222222
+export EVENT_IDENTIFIER=raymundo-6
 export HOST_ADMIN_TOKEN='replace-with-the-value-from-your-env-file'
 
-curl -X POST "http://localhost:3001/api/host/events/$EVENT_ID/guests" \
+curl -X POST "http://localhost:3001/api/host/events/$EVENT_IDENTIFIER/guests" \
   -H "Authorization: Bearer $HOST_ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"displayName":"Family Sample","preferredChannel":"MANUAL","locale":"en-US","createInvitation":false}'
+  -d '{"displayName":"Family Sample","preferredChannel":"MANUAL","locale":"en-US","invitationCountMode":"TOTAL_ONLY","totalInvited":4,"createInvitation":false}'
 ```
 
 Copy the returned guest `id`, then create its invitation:
@@ -112,7 +112,7 @@ http://localhost:3000/i/{token}
 List guests, including archived records:
 
 ```bash
-curl "http://localhost:3001/api/host/events/$EVENT_ID/guests?includeArchived=true" \
+curl "http://localhost:3001/api/host/events/$EVENT_IDENTIFIER/guests?includeArchived=true" \
   -H "Authorization: Bearer $HOST_ADMIN_TOKEN"
 ```
 

@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { HostGuestPanel } from '../../../../../components/host-guest-panel';
 import { HOST_SESSION_COOKIE, validSessionValue } from '../../../../../lib/host-session';
 
@@ -13,5 +13,6 @@ export default async function HostGuestsPage({
   const { identifier } = await params;
   const hasSession = validSessionValue((await cookies()).get(HOST_SESSION_COOKIE)?.value ?? '');
   if (!hasSession) redirect('/host/access');
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(identifier)) notFound();
   return <HostGuestPanel eventIdentifier={identifier} />;
 }

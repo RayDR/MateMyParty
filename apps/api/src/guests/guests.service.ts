@@ -3,6 +3,8 @@ import {
   createGuestInputSchema,
   createGuestRequestSchema,
   updateGuestInputSchema,
+  guestInvitationStatisticsSchema,
+  type GuestInvitationStatistics,
   type HostGuest,
 } from '@matemyparty/contracts';
 import type { DatabaseConnection } from '@matemyparty/database';
@@ -32,6 +34,11 @@ export class GuestsService {
     );
   }
 
+  async statistics(eventIdentifier: string): Promise<GuestInvitationStatistics> {
+    const guests = await this.list(eventIdentifier, true);
+    return calculateGuestInvitationStatistics(guests);
+  }
+
   create(eventIdentifier: string, rawInput: unknown) {
     const request = parseInput(createGuestRequestSchema, rawInput);
     const { createInvitation, ...guestRequest } = request;
@@ -58,10 +65,12 @@ export class GuestsService {
         phone: patch.phone === undefined ? existing.phone : patch.phone,
         preferredChannel: patch.preferredChannel ?? existing.preferredChannel,
         locale: patch.locale ?? existing.locale,
-        adultsPlanned:
-          patch.adultsPlanned === undefined ? existing.adultsPlanned : patch.adultsPlanned,
-        childrenPlanned:
-          patch.childrenPlanned === undefined ? existing.childrenPlanned : patch.childrenPlanned,
+        invitationCountMode: patch.invitationCountMode ?? existing.invitationCountMode,
+        totalInvited: patch.totalInvited === undefined ? existing.totalInvited : patch.totalInvited,
+        adultsInvited:
+          patch.adultsInvited === undefined ? existing.adultsInvited : patch.adultsInvited,
+        childrenInvited:
+          patch.childrenInvited === undefined ? existing.childrenInvited : patch.childrenInvited,
         privateNotes: patch.privateNotes === undefined ? existing.privateNotes : patch.privateNotes,
       });
       const updated = await this.guests.update(guestId, normalized, executor);
@@ -83,4 +92,34 @@ export class GuestsService {
       );
     });
   }
+
+  restore(guestId: string) {
+    return this.connection.db.transaction(async (executor) => {
+      const restored = await this.guests.restore(guestId, executor);
+      if (!restored) throw new ApiError(404, 'GUEST_NOT_FOUND', 'Guest not found');
+      return presentGuest(
+        restored,
+        await this.invitationsRepository.findLatestByGuest(guestId, executor),
+      );
+    });
+  }
+}
+
+export function calculateGuestInvitationStatistics(guests: HostGuest[]): GuestInvitationStatistics {
+  const activeGuests = guests.filter((guest) => !guest.archivedAt);
+  const activeInvitations = activeGuests.filter(
+    (guest) => guest.invitation && !guest.invitation.revokedAt,
+  );
+  return guestInvitationStatisticsSchema.parse({
+    totalGuests: activeGuests.length,
+    totalPeopleInvited: activeGuests.reduce((total, guest) => total + guest.totalInvited, 0),
+    generated: activeInvitations.length,
+    notGenerated: activeGuests.length - activeInvitations.length,
+    opened: activeInvitations.filter((guest) => (guest.invitation?.openCount ?? 0) > 0).length,
+    notOpened: activeInvitations.filter((guest) => (guest.invitation?.openCount ?? 0) === 0).length,
+    revoked: activeGuests.filter((guest) => Boolean(guest.invitation?.revokedAt)).length,
+    notContactable: activeGuests.filter(
+      (guest) => !guest.notificationEligibility.canNotifyAutomatically,
+    ).length,
+  });
 }

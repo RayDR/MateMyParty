@@ -6,7 +6,12 @@ import {
   publicInvitationSchema,
 } from './invitations.js';
 
-const base = { displayName: ' Family Sample ', locale: 'en-US' as const };
+const base = {
+  displayName: ' Family Sample ',
+  locale: 'en-US' as const,
+  invitationCountMode: 'TOTAL_ONLY' as const,
+  totalInvited: 4,
+};
 
 describe('guest validation', () => {
   it('creates a trimmed MANUAL guest without contact data', () => {
@@ -31,8 +36,29 @@ describe('guest validation', () => {
 
   it('rejects negative party counts', () => {
     expect(() =>
-      createGuestInputSchema.parse({ ...base, preferredChannel: 'MANUAL', adultsPlanned: -1 }),
+      createGuestInputSchema.parse({ ...base, preferredChannel: 'MANUAL', totalInvited: -1 }),
     ).toThrow();
+    expect(() =>
+      createGuestInputSchema.parse({
+        ...base,
+        invitationCountMode: 'ADULTS_AND_CHILDREN',
+        adultsInvited: -1,
+        childrenInvited: 2,
+        preferredChannel: 'MANUAL',
+      }),
+    ).toThrow();
+  });
+
+  it('derives the total from adult and child counts', () => {
+    const guest = createGuestInputSchema.parse({
+      ...base,
+      invitationCountMode: 'ADULTS_AND_CHILDREN',
+      totalInvited: null,
+      adultsInvited: 3,
+      childrenInvited: 2,
+      preferredChannel: 'MANUAL',
+    });
+    expect(guest).toMatchObject({ totalInvited: 5, adultsInvited: 3, childrenInvited: 2 });
   });
 });
 
@@ -66,6 +92,12 @@ describe('public invitation privacy', () => {
       status: 'OPENED',
       locale: 'en-US',
       openedPreviously: false,
+      shareMetadata: {
+        title: 'Birthday',
+        description: 'You are invited to Birthday.',
+        thumbnailImageRef: null,
+        thumbnailAltText: 'Birthday thumbnail',
+      },
       capabilities: { canRespond: false, canAddToCalendar: false },
       email: 'private@example.test',
       phone: 'private',
