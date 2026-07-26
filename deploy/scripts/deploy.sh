@@ -34,6 +34,21 @@ run_pnpm() {
     "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" "$@"
 }
 
+assert_loopback_listener() {
+  local service_name="$1"
+  local port="$2"
+  local expected_address="127.0.0.1:${port}"
+  local listeners
+
+  listeners="$(ss -H -ltn "sport = :${port}")"
+  awk -v expected="${expected_address}" '$4 == expected { found = 1 } END { exit !found }' \
+    <<<"${listeners}" || die "${service_name} listener is missing from ${expected_address}"
+  if awk -v expected="${expected_address}" '$4 != expected { found = 1 } END { exit !found }' \
+    <<<"${listeners}"; then
+    die "${service_name} port ${port} is listening beyond IPv4 loopback"
+  fi
+}
+
 if [[ ${EUID} -ne 0 ]]; then
   die "run this script as root"
 fi
@@ -133,6 +148,7 @@ for attempt in {1..20}; do
   fi
   sleep 1
 done
+assert_loopback_listener "API" "${API_PORT}"
 
 systemctl restart matemyparty-web.service
 for attempt in {1..20}; do
@@ -145,6 +161,7 @@ for attempt in {1..20}; do
   fi
   sleep 1
 done
+assert_loopback_listener "web" "${WEB_PORT}"
 
 printf '%s\n' "${target_commit}" >"${DEPLOYMENT_STATE_DIRECTORY}/current-commit"
 echo "MateMyParty deployment completed at ${target_commit}."
