@@ -3,5 +3,7 @@
   "preparedFor": "This invitation was prepared for {guestName}.",
   "rsvpSoon": "RSVP will be available soon.",
   "invalidTitle": "This invitation is unavailable",
-  "invalidMessage": "The link may be invalid, expired, or no longer active."
+  "invalidMessage": "The link may be invalid, expired, or no longer active.",
+  "enterDragonWorld": "Enter the Dragon World",
+  "fallbackExperience": "Night Fury signal detected"
 }
