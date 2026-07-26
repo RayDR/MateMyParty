@@ -50,7 +50,7 @@ scp /local/path/dragons-theme.mp3 \
   sysops@domoforge.com:/forge/matemyparty-private-media/raymundo-6/
 ```
 
-Nginx disables directory listing and access logging for `/private-media/`. Missing files return `404` with the privacy headers below. The Next.js service does not need filesystem access to the media directory.
+Nginx disables directory listing and access logging for `/private-media/`. It also suppresses access logging for private invitation pages and public invitation API lookups because both paths contain the invitation token. Missing files return `404` with the privacy headers below. The Next.js service does not need filesystem access to the media directory.
 
 ## Required formats
 
