@@ -1,9 +1,12 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { EventInvitation } from '../components/event-invitation';
 
 describe('event page content', () => {
-  it('renders localized seeded event details', () => {
+  it('renders localized seeded event details after visitor interaction', async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    const user = userEvent.setup();
     render(
       <EventInvitation
         locale="en-US"
@@ -32,6 +35,7 @@ describe('event page content', () => {
         }}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Enter the Dragon World' }));
     expect(screen.getByRole('heading', { name: 'Raymundo’s 6th Birthday' })).toBeInTheDocument();
     expect(screen.getByText('Kids Empire Dallas Hillcrest')).toBeInTheDocument();
     expect(screen.getByText('1:00 PM')).toBeInTheDocument();

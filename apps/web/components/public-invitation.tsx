@@ -18,8 +18,16 @@ export function PublicInvitation({ invitation }: { invitation: PublicInvitationD
 
   return (
     <DragonInvitationExperience
-      enterLabel={dictionary.invitation.enterDragonWorld}
-      fallbackLabel={dictionary.invitation.fallbackExperience}
+      labels={{
+        enter: dictionary.invitation.enterDragonWorld,
+        fallback: dictionary.invitation.fallbackExperience,
+        introPrompt: dictionary.invitation.dragonAwaits,
+        video: dictionary.invitation.mediaControls,
+        play: dictionary.invitation.playMedia,
+        pause: dictionary.invitation.pauseMedia,
+        mute: dictionary.invitation.muteMedia,
+        soundOn: dictionary.invitation.unmuteMedia,
+      }}
     >
       <div className="mx-auto flex min-h-screen max-w-3xl items-center p-5">
         <Card>

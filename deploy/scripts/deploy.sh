@@ -12,7 +12,7 @@ readonly NODE_BINARY="${RUNTIME_DIRECTORY}/bin/node"
 readonly PNPM_BINARY="${RUNTIME_DIRECTORY}/bin/pnpm"
 
 usage() {
-  echo "Usage: sudo $0 --ref <main|develop|vX.Y.Z|40-character-commit>" >&2
+  echo "Usage: sudo $0 --ref <main|develop|feature/raymundo-dragon-invitation|vX.Y.Z|40-character-commit>" >&2
 }
 
 die() {
@@ -64,6 +64,10 @@ case "${requested_ref}" in
     target_ref="refs/remotes/origin/develop"
     allowed_upstream="refs/remotes/origin/develop"
     ;;
+  feature/raymundo-dragon-invitation)
+    target_ref="refs/remotes/origin/feature/raymundo-dragon-invitation"
+    allowed_upstream="refs/remotes/origin/feature/raymundo-dragon-invitation"
+    ;;
   v[0-9]*.[0-9]*.[0-9]*)
     target_ref="refs/tags/${requested_ref}"
     allowed_upstream="refs/remotes/origin/main"
@@ -71,9 +75,9 @@ case "${requested_ref}" in
   *)
     if [[ ${requested_ref} =~ ^[0-9a-f]{40}$ ]]; then
       target_ref="${requested_ref}"
-      allowed_upstream="refs/remotes/origin/develop"
+      allowed_upstream="refs/remotes/origin/feature/raymundo-dragon-invitation"
     else
-      die "ref must be main, develop, a semantic version tag, or a full commit SHA"
+      die "ref must be main, develop, feature/raymundo-dragon-invitation, a semantic version tag, or a full commit SHA"
     fi
     ;;
 esac
@@ -84,8 +88,14 @@ run_git merge-base --is-ancestor \
   "${target_commit}" "${allowed_upstream}" ||
   die "requested commit is not part of ${allowed_upstream}"
 
-previous_commit="$(run_git rev-parse HEAD)"
 install -d -m 0750 -o root -g root "${DEPLOYMENT_STATE_DIRECTORY}"
+if [[ -s ${DEPLOYMENT_STATE_DIRECTORY}/current-commit ]]; then
+  read -r previous_commit <"${DEPLOYMENT_STATE_DIRECTORY}/current-commit"
+  [[ ${previous_commit} =~ ^[0-9a-f]{40}$ ]] || die "current deployment state is invalid"
+  run_git cat-file -e "${previous_commit}^{commit}" || die "current deployed commit is unavailable"
+else
+  previous_commit="$(run_git rev-parse HEAD)"
+fi
 printf '%s\n' "${previous_commit}" >"${DEPLOYMENT_STATE_DIRECTORY}/previous-commit"
 
 run_git switch --detach "${target_commit}"
@@ -102,9 +112,14 @@ set -a
 # shellcheck disable=SC1090
 source "${ENVIRONMENT_FILE}"
 set +a
-runuser --user "${DEPLOY_USER}" --whitelist-environment=DATABASE_URL -- \
-  /usr/bin/env "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
-  "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" db:migrate
+if ! run_git diff --quiet "${previous_commit}" "${target_commit}" -- \
+  packages/database/migrations; then
+  runuser --user "${DEPLOY_USER}" --whitelist-environment=DATABASE_URL -- \
+    /usr/bin/env "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
+    "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" db:migrate
+else
+  echo "No database migration changes detected; migration skipped."
+fi
 unset DATABASE_URL HOST_ADMIN_TOKEN
 
 systemctl restart matemyparty-api.service

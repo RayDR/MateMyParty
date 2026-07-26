@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { InvalidInvitation, PublicInvitation } from '../components/public-invitation';
 
 const invitation = {
@@ -34,8 +35,11 @@ const invitation = {
 };
 
 describe('/i/[token] content', () => {
-  it('renders a personalized public invitation without private contacts', () => {
+  it('renders a personalized public invitation without private contacts', async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    const user = userEvent.setup();
     render(<PublicInvitation invitation={invitation} />);
+    await user.click(screen.getByRole('button', { name: 'Enter the Dragon World' }));
     expect(screen.getByText('This invitation was prepared for Family Sample.')).toBeInTheDocument();
     expect(screen.getByText('1:00 PM')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('@');

@@ -5,5 +5,11 @@
   "invalidTitle": "Esta invitación no está disponible",
   "invalidMessage": "Es posible que el enlace no sea válido, haya vencido o ya no esté activo.",
   "enterDragonWorld": "Entrar al mundo de los dragones",
-  "fallbackExperience": "Señal de Furia Nocturna detectada"
+  "fallbackExperience": "Señal de Furia Nocturna detectada",
+  "dragonAwaits": "Una Furia Nocturna te espera",
+  "mediaControls": "Controles multimedia de la invitación",
+  "playMedia": "Reproducir",
+  "pauseMedia": "Pausar",
+  "muteMedia": "Silenciar",
+  "unmuteMedia": "Activar sonido"
 }

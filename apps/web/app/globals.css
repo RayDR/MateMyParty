@@ -37,7 +37,14 @@ body {
   width: clamp(3.5rem, 12vw, 7rem);
   aspect-ratio: 2 / 1;
   border-radius: 80% 10% 80% 10%;
-  background: radial-gradient(ellipse at center, #05110d 0 14%, #34d399 17%, #a7f3d0 35%, #10b981 55%, transparent 72%);
+  background: radial-gradient(
+    ellipse at center,
+    #05110d 0 14%,
+    #34d399 17%,
+    #a7f3d0 35%,
+    #10b981 55%,
+    transparent 72%
+  );
   filter: drop-shadow(0 0 22px rgba(52, 211, 153, 0.95));
   animation: dragon-blink 7s infinite;
 }
@@ -67,7 +74,10 @@ body {
 }
 
 @keyframes dragon-blink {
-  0%, 45%, 49%, 100% {
+  0%,
+  45%,
+  49%,
+  100% {
     transform-origin: center;
     opacity: 1;
   }
@@ -79,7 +89,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dragon-pulse::before,
   .dragon-pulse::after,
-  .dragon-eye {
+  .dragon-eye,
+  .dragon-media-transition {
     animation: none;
+    transition: none;
   }
 }
