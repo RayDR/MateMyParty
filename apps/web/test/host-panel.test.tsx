@@ -30,7 +30,7 @@ describe('temporary host panel', () => {
         ],
       }),
     );
-    render(<HostGuestPanel eventId="22222222-2222-4222-8222-222222222222" />);
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     expect(await screen.findByRole('heading', { name: 'Family Sample' })).toBeInTheDocument();
   });
 });

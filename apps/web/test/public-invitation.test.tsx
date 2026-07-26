@@ -21,7 +21,7 @@ const invitation = {
     postalCode: null,
     countryCode: null,
     publicSlug: 'raymundo-6',
-    templateKey: 'kids-night-dragon',
+    templateKey: 'kids-night-dragon' as const,
     templateVersion: 1,
     hostMessage: null,
     rsvpDeadline: null,

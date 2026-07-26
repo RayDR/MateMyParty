@@ -21,6 +21,7 @@ export const eventStatus = pgEnum('event_status', [
   'ARCHIVED',
 ]);
 export const eventType = pgEnum('event_type', ['KIDS_BIRTHDAY']);
+export const eventAnimationMode = pgEnum('event_animation_mode', ['NONE', 'SUBTLE', 'IMMERSIVE']);
 export const preferredChannel = pgEnum('preferred_channel', ['EMAIL', 'SMS', 'BOTH', 'MANUAL']);
 export const invitationStatus = pgEnum('invitation_status', [
   'DRAFT',
@@ -77,14 +78,59 @@ export const events = pgTable(
     postalCode: text('postal_code'),
     countryCode: text('country_code'),
     publicSlug: text('public_slug').notNull(),
+    publicCode: text('public_code').notNull(),
     templateKey: text('template_key').notNull(),
     templateVersion: integer('template_version').notNull(),
+    animationMode: eventAnimationMode('animation_mode').notNull().default('NONE'),
+    videoBackgroundRef: text('video_background_ref'),
+    staticFallbackRef: text('static_fallback_ref'),
+    audioRef: text('audio_ref'),
+    animationEnabled: boolean('animation_enabled').notNull().default(false),
+    audioEnabled: boolean('audio_enabled').notNull().default(false),
+    overlayIntensity: integer('overlay_intensity').notNull().default(50),
+    thumbnailImageRef: text('thumbnail_image_ref'),
+    staticBackgroundRef: text('static_background_ref'),
+    mapsUrl: text('maps_url'),
     hostMessage: text('host_message'),
     rsvpDeadline: timestamp('rsvp_deadline', { withTimezone: true, mode: 'date' }),
     ...auditColumns,
   },
   (table) => [
     uniqueIndex('events_public_slug_normalized_unique').on(sql`lower(${table.publicSlug})`),
+    uniqueIndex('events_public_code_unique').on(table.publicCode),
+    check('events_public_code_format_check', sql`${table.publicCode} ~ '^[A-HJ-NP-Z2-9]{8,10}$'`),
+    check(
+      'events_template_key_check',
+      sql`${table.templateKey} in ('kids-night-dragon', 'envelope-reveal', 'winter-snow', 'adventure-gates')`,
+    ),
+    check('events_overlay_intensity_check', sql`${table.overlayIntensity} between 0 and 100`),
+    check(
+      'events_end_after_start_check',
+      sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
+    ),
+  ],
+);
+
+export const eventLocalizations = pgTable(
+  'event_localizations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    locale: text('locale').notNull(),
+    title: text('title').notNull(),
+    celebrantName: text('celebrant_name').notNull(),
+    venueName: text('venue_name'),
+    hostMessage: text('host_message'),
+    arrivalInstructions: text('arrival_instructions'),
+    thumbnailAltText: text('thumbnail_alt_text').notNull(),
+    ...auditColumns,
+  },
+  (table) => [
+    uniqueIndex('event_localizations_event_locale_unique').on(table.eventId, table.locale),
+    index('event_localizations_event_id_index').on(table.eventId),
+    check('event_localizations_locale_check', sql`${table.locale} in ('en-US', 'es-MX')`),
   ],
 );
 

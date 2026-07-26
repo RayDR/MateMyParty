@@ -18,6 +18,12 @@ Host contracts intentionally include contact and operational data. They are avai
 
 The mechanism has no users, roles, per-event grants, session revocation list, rate limit, or second factor. Replace it with authenticated users, rotating sessions, CSRF review, and event ownership authorization before a public host launch.
 
+The temporary dashboard lists every event available to the shared host context. Public slugs and random event codes keep UUIDs out of visible navigation, but they are identifiers rather than authorization credentials. The API guard remains mandatory for list, detail, statistics, update, guest, and invitation operations.
+
+`GET /host/access` contains only the password form. `POST /host/access` is handled server-side, derives the session cookie, and builds redirects from the validated forwarded host with HTTPS forced in production. `HOST_ADMIN_TOKEN` must never be included in HTML, browser JavaScript, URLs, local storage, response bodies, or logs.
+
+Event updates accept only shared-contract fields, supported locales, allowed template keys, valid date ordering, bounded overlay values, HTTPS media URLs, or protected event-media paths. Every successful update and its revision snapshot are committed transactionally.
+
 ## Open tracking and logging
 
 Invitation activity can store a user agent truncated to 160 characters, one supported requested locale, and a referrer hostname. It does not store full referrer URLs or IP addresses. Infrastructure access logs must redact `/i/*` path segments because the URL itself contains a credential. Application code must never log request parameters for invitation routes.

@@ -1,6 +1,13 @@
 import 'dotenv/config';
 import { createDatabase } from './client.js';
-import { eventDomains, eventRevisions, events, guests, users } from './schema.js';
+import {
+  eventDomains,
+  eventLocalizations,
+  eventRevisions,
+  events,
+  guests,
+  users,
+} from './schema.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
@@ -10,6 +17,8 @@ const ids = {
   event: '22222222-2222-4222-8222-222222222222',
   domain: '33333333-3333-4333-8333-333333333333',
   revision: '44444444-4444-4444-8444-444444444444',
+  localizationEn: '77777777-7777-4777-8777-777777777777',
+  localizationEs: '88888888-8888-4888-8888-888888888888',
 } as const;
 
 const event = {
@@ -32,11 +41,47 @@ const event = {
   postalCode: null,
   countryCode: null,
   publicSlug: 'raymundo-6',
+  publicCode: 'SQ52LQE9',
   templateKey: 'kids-night-dragon',
   templateVersion: 1,
+  animationMode: 'IMMERSIVE' as const,
+  videoBackgroundRef: '/private-media/raymundo-6/dragons-intro.mp4',
+  staticFallbackRef: null,
+  audioRef: '/private-media/raymundo-6/dragons-theme.mp3',
+  animationEnabled: true,
+  audioEnabled: true,
+  overlayIntensity: 50,
+  thumbnailImageRef: null,
+  staticBackgroundRef: null,
+  mapsUrl: null,
   hostMessage: null,
   rsvpDeadline: null,
 };
+
+const localizedContent = [
+  {
+    id: ids.localizationEn,
+    eventId: ids.event,
+    locale: 'en-US',
+    title: 'Raymundo’s 6th Birthday',
+    celebrantName: 'Raymundo',
+    venueName: 'Kids Empire Dallas Hillcrest',
+    hostMessage: null,
+    arrivalInstructions: null,
+    thumbnailAltText: 'Raymundo’s 6th birthday',
+  },
+  {
+    id: ids.localizationEs,
+    eventId: ids.event,
+    locale: 'es-MX',
+    title: 'Sexto cumpleaños de Raymundo',
+    celebrantName: 'Raymundo',
+    venueName: 'Kids Empire Dallas Hillcrest',
+    hostMessage: null,
+    arrivalInstructions: null,
+    thumbnailAltText: 'Sexto cumpleaños de Raymundo',
+  },
+] as const;
 
 async function run(url: string) {
   const connection = createDatabase(url);
@@ -53,6 +98,10 @@ async function run(url: string) {
         .onConflictDoNothing();
       await tx.insert(events).values(event).onConflictDoNothing();
       await tx
+        .insert(eventLocalizations)
+        .values([...localizedContent])
+        .onConflictDoNothing();
+      await tx
         .insert(eventDomains)
         .values({
           id: ids.domain,
@@ -67,7 +116,11 @@ async function run(url: string) {
           id: ids.revision,
           eventId: ids.event,
           revisionNumber: 1,
-          snapshot: { ...event, startsAt: event.startsAt.toISOString() },
+          snapshot: {
+            ...event,
+            startsAt: event.startsAt.toISOString(),
+            localizedContent,
+          },
           changeReason: 'Initial seed',
         })
         .onConflictDoNothing();

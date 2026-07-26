@@ -14,4 +14,21 @@ describe('hostname proxy', () => {
       'http://localhost:3200/site-hosts/raymundo6th.domoforge.com',
     );
   });
+
+  it('keeps host dashboard routes out of custom event hostname rewrites', () => {
+    const request = new NextRequest('https://localhost:3200/host/events', {
+      headers: { host: 'raymundo6th.domoforge.com' },
+    });
+    expect(proxy(request).headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('rewrites POST /host/access to the server-only handler', () => {
+    const request = new NextRequest('https://localhost:3200/host/access', {
+      method: 'POST',
+      headers: { host: 'matemyparty.domoforge.com' },
+    });
+    expect(proxy(request).headers.get('x-middleware-rewrite')).toBe(
+      'http://localhost:3200/internal/host/access',
+    );
+  });
 });
