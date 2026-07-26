@@ -109,7 +109,7 @@ unset DATABASE_URL HOST_ADMIN_TOKEN
 
 systemctl restart matemyparty-api.service
 for attempt in {1..20}; do
-  if curl --fail --silent --show-error --max-time 3 \
+  if curl --fail --silent --max-time 3 \
     "http://127.0.0.1:${API_PORT}/health" >/dev/null; then
     break
   fi
@@ -121,7 +121,7 @@ done
 
 systemctl restart matemyparty-web.service
 for attempt in {1..20}; do
-  if curl --fail --silent --show-error --max-time 3 \
+  if curl --fail --silent --max-time 3 \
     --header 'Host: matemyparty.domoforge.com' "http://127.0.0.1:${WEB_PORT}/" >/dev/null; then
     break
   fi
