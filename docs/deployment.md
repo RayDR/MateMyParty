@@ -10,7 +10,7 @@ The 2026-07-26 inspection found:
 - Shell Node.js 22.17.0 and pnpm 11.17.0 are provided by the `sysops` NVM installation.
 - System Node.js 18.19.1 remains in use by unrelated services. MateMyParty uses an isolated Node.js 22.17.0 and pnpm 11.17.0 runtime under `/opt/matemyparty/runtime`.
 - PostgreSQL 16.14, Nginx 1.24.0, systemd 255, Certbot 2.9.0, and UFW are active.
-- Port 3000 belongs to an unrelated `/opt/pzwebadmin` service. MateMyParty therefore uses `127.0.0.1:3200` for web and `127.0.0.1:3001` for API.
+- Ports 3000 and 3001 are assigned to unrelated VPS applications. MateMyParty therefore uses `127.0.0.1:3200` for web and `127.0.0.1:3201` for API.
 - PostgreSQL currently listens on all interfaces. Its firewall exposure and remote consumers must be audited before changing `listen_addresses`.
 - Both public hostnames now resolve to this VPS at `66.179.210.180`, with no published AAAA records.
 - The current operator does not have passwordless sudo. Privileged provisioning commands below require an interactive sudo session.
@@ -77,7 +77,7 @@ sudo chown root:root /etc/matemyparty/matemyparty.env
 sudo chmod 0600 /etc/matemyparty/matemyparty.env
 ```
 
-Replace every placeholder. Use a cryptographically random `HOST_ADMIN_TOKEN` of at least 32 characters. The production file must retain `WEB_HOST=127.0.0.1`, `WEB_PORT=3200`, `API_HOST=127.0.0.1`, `API_PORT=3001`, `INTERNAL_API_BASE_URL=http://127.0.0.1:3001`, `PRIMARY_APP_HOSTNAME=matemyparty.domoforge.com`, and `PUBLIC_APP_PROTOCOL=https`.
+Replace every placeholder. Use a cryptographically random `HOST_ADMIN_TOKEN` of at least 32 characters. The production file must retain `WEB_HOST=127.0.0.1`, `WEB_PORT=3200`, `API_HOST=127.0.0.1`, `API_PORT=3201`, `INTERNAL_API_BASE_URL=http://127.0.0.1:3201`, `PRIMARY_APP_HOSTNAME=matemyparty.domoforge.com`, and `PUBLIC_APP_PROTOCOL=https`.
 
 `INTERNAL_API_BASE_URL` is server-only and deliberately has no `NEXT_PUBLIC_` prefix. The browser uses relative `/internal/host/*` requests and never receives `HOST_ADMIN_TOKEN`.
 
@@ -142,8 +142,8 @@ sudo systemctl enable --now matemyparty-backup.timer
 Confirm loopback-only listeners and local behavior before touching Nginx:
 
 ```bash
-sudo ss -lntp '( sport = :3200 or sport = :3001 )'
-curl --fail http://127.0.0.1:3001/health
+sudo ss -lntp '( sport = :3200 or sport = :3201 )'
+curl --fail http://127.0.0.1:3201/health
 curl --fail --header 'Host: matemyparty.domoforge.com' http://127.0.0.1:3200/
 curl --fail --header 'Host: raymundo6th.domoforge.com' http://127.0.0.1:3200/
 curl --fail http://127.0.0.1:3200/events/raymundo-6
@@ -164,7 +164,7 @@ The safe MateMyParty change plan is:
 
 1. Confirm an existing SSH allow rule and the current remote session before any edit.
 2. Ensure TCP 80 and 443 are allowed for Nginx.
-3. Do not add public rules for 3001 or 3200.
+3. Do not add public rules for 3200 or 3201.
 4. Remove any existing public allow for 5432 only after confirming no unrelated remote PostgreSQL client depends on it.
 5. Keep loopback traffic allowed and recheck the SSH session after each change.
 
@@ -245,7 +245,7 @@ The script fetches safely, rejects a dirty tree or a commit outside the selected
 ## Acceptance checklist
 
 1. DNS resolves both names only to the intended VPS addresses.
-2. UFW permits SSH, HTTP, and HTTPS but not 3001, 3200, or 5432.
+2. UFW permits SSH, HTTP, and HTTPS but not 3200, 3201, or 5432.
 3. PostgreSQL remote exposure has been eliminated without breaking unrelated clients.
 4. The environment is mode `0600`, owned by root, and unreadable by service or other users.
 5. Migrations and two seeds succeed; event data is unchanged.

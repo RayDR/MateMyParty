@@ -34,13 +34,13 @@ The expected result is no output. Do not disable the error log globally.
 ## Local health and listeners
 
 ```bash
-curl --fail http://127.0.0.1:3001/health
+curl --fail http://127.0.0.1:3201/health
 curl --fail --header 'Host: matemyparty.domoforge.com' http://127.0.0.1:3200/
 curl --fail --header 'Host: raymundo6th.domoforge.com' http://127.0.0.1:3200/
-sudo ss -lntp '( sport = :3001 or sport = :3200 or sport = :5432 )'
+sudo ss -lntp '( sport = :3200 or sport = :3201 or sport = :5432 )'
 ```
 
-MateMyParty must bind 3001 and 3200 only to `127.0.0.1`. PostgreSQL should be loopback-only after shared-client review. Port 3000 is owned by an unrelated VPS application and is not a MateMyParty listener.
+MateMyParty must bind 3200 and 3201 only to `127.0.0.1`. PostgreSQL should be loopback-only after shared-client review. Ports 3000 and 3001 are assigned to unrelated VPS applications and are not MateMyParty listeners.
 
 ## Public health
 
