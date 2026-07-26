@@ -15,6 +15,13 @@
       "when": 1785044273961,
       "tag": "0001_real_stingray",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785105591572,
+      "tag": "0002_careful_lockheed",
+      "breakpoints": true
     }
   ]
 }

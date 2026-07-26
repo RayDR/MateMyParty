@@ -10,6 +10,8 @@ MateMyParty starts as a modular monolith: one web application, one API process, 
 
 The initial birthday is an ordinary `Event` owned by a `User`, with a replaceable template key. As the platform grows it remains queryable, and revisions retain its historical snapshots.
 
+Host-facing routes identify events by their normalized public slug and fall back to an 8-character cryptographically random public code. UUIDs remain primary and foreign keys inside the API and database, but are not part of host navigation. PostgreSQL enforces code uniqueness; API allocation retries the negligible collision case.
+
 ## Boundaries
 
 - `apps/web` renders public experiences and talks only to HTTP contracts.
@@ -23,9 +25,19 @@ The web app never imports the database package. Repositories are the only curren
 
 Locales are event data, independent from domains and users. `en-US` and `es-MX` dictionaries are separate JSON resources split into common and event namespaces. UI components consume dictionaries, not locale conditionals. Dates are stored in UTC and formatted with the event's IANA time zone.
 
+Editable invitation content lives in `event_localizations`, one row per event and supported locale. The canonical columns on `events` mirror the selected default locale for compatibility with the existing public API. Host updates require both supported locales and update the canonical view and localized rows in one transaction.
+
 ## Revisions
 
-`EventRevision` records a monotonic revision number and JSONB snapshot. The seed creates revision 1. This is an audit/history foundation, not yet a restore engine; later write use cases should create revisions in the same database transaction as important changes.
+`EventRevision` records a monotonic revision number and JSONB snapshot. The seed creates revision 1. Host event updates lock the event row, update event and localization data, and create the next `HOST_EVENT_UPDATE` revision in the same transaction. This is an audit/history foundation, not yet a restore engine.
+
+## Host event management
+
+`/host/access` is the temporary server-rendered entry point. Its POST is rewritten to a server-only handler, which creates the derived HttpOnly session and redirects to `/host/events` using the forwarded public HTTPS hostname. The dashboard and editor use protected Next route handlers; those handlers validate the cookie and attach the bearer token only on the server.
+
+The API remains authoritative for dashboard statistics, event reads, validation, updates, and revision creation. Controllers contain no SQL. `/api/host/events/:identifier` resolves either a slug or public code internally, and guest routes use the same identifier resolution.
+
+Event media is referenced rather than uploaded in this milestone. See [event-media.md](event-media.md) for the protected path contract and deployment permissions.
 
 ## Guests and invitations
 

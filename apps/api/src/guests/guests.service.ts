@@ -8,6 +8,7 @@ import {
 import type { DatabaseConnection } from '@matemyparty/database';
 import { ApiError, parseInput } from '../common/api-error';
 import { DATABASE } from '../database/database.module';
+import { EventsRepository } from '../events/events.repository';
 import { InvitationsRepository } from '../invitations/invitations.repository';
 import { InvitationsService } from '../invitations/invitations.service';
 import { presentGuest } from './guest.presenter';
@@ -17,26 +18,27 @@ import { GuestsRepository } from './guests.repository';
 export class GuestsService {
   constructor(
     @Inject(DATABASE) private readonly connection: DatabaseConnection,
+    private readonly events: EventsRepository,
     private readonly guests: GuestsRepository,
     private readonly invitationsRepository: InvitationsRepository,
     private readonly invitations: InvitationsService,
   ) {}
 
-  async list(eventId: string, includeArchived: boolean): Promise<HostGuest[]> {
-    if (!(await this.guests.eventExists(eventId)))
-      throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
+  async list(eventIdentifier: string, includeArchived: boolean): Promise<HostGuest[]> {
+    const eventId = await this.events.findInternalIdByIdentifier(eventIdentifier);
+    if (!eventId) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
     return (await this.guests.list(eventId, includeArchived)).map(({ guest, invitation }) =>
       presentGuest(guest, invitation),
     );
   }
 
-  create(eventId: string, rawInput: unknown) {
+  create(eventIdentifier: string, rawInput: unknown) {
     const request = parseInput(createGuestRequestSchema, rawInput);
     const { createInvitation, ...guestRequest } = request;
     const input = parseInput(createGuestInputSchema, guestRequest);
     return this.connection.db.transaction(async (executor) => {
-      if (!(await this.guests.eventExists(eventId, executor)))
-        throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
+      const eventId = await this.events.findInternalIdByIdentifier(eventIdentifier, executor);
+      if (!eventId) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
       const guest = await this.guests.insert(eventId, input, executor);
       if (createInvitation)
         return this.invitations.createForGuestInTransaction(guest, executor, 'CREATED');

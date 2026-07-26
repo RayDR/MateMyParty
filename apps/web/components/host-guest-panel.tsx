@@ -8,7 +8,7 @@ import { Card } from '@matemyparty/ui';
 type Filter = 'all' | 'without' | 'notOpened' | 'opened' | 'archived';
 type InvitationResult = { invitation: NonNullable<HostGuest['invitation']>; publicUrl: string };
 
-export function HostGuestPanel({ eventId }: { eventId: string }) {
+export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string }) {
   const [locale, setLocale] = useState<Locale>('en-US');
   const [guests, setGuests] = useState<HostGuest[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -21,15 +21,16 @@ export function HostGuestPanel({ eventId }: { eventId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const response = await fetch(`/internal/host/events/${eventId}/guests?includeArchived=true`, {
-      cache: 'no-store',
-    });
+    const response = await fetch(
+      `/internal/host/events/${encodeURIComponent(eventIdentifier)}/guests?includeArchived=true`,
+      { cache: 'no-store' },
+    );
     if (response.ok) {
       setGuests((await response.json()) as HostGuest[]);
       setError(false);
     } else setError(true);
     setLoading(false);
-  }, [eventId]);
+  }, [eventIdentifier]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -68,7 +69,9 @@ export function HostGuestPanel({ eventId }: { eventId: string }) {
       ...(!editing ? { createInvitation: form.get('createInvitation') === 'on' } : {}),
     };
     const response = await fetch(
-      editing ? `/internal/host/guests/${editing.id}` : `/internal/host/events/${eventId}/guests`,
+      editing
+        ? `/internal/host/guests/${editing.id}`
+        : `/internal/host/events/${encodeURIComponent(eventIdentifier)}/guests`,
       {
         method: editing ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },

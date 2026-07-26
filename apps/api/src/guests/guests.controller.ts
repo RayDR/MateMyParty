@@ -21,15 +21,15 @@ export class GuestsController {
 
   @Get('events/:eventId/guests')
   list(
-    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('eventId') eventIdentifier: string,
     @Query('includeArchived', new DefaultValuePipe(false), ParseBoolPipe) includeArchived: boolean,
   ) {
-    return this.guests.list(eventId, includeArchived);
+    return this.guests.list(eventIdentifier, includeArchived);
   }
 
   @Post('events/:eventId/guests')
-  create(@Param('eventId', new ParseUUIDPipe()) eventId: string, @Body() body: unknown) {
-    return this.guests.create(eventId, body);
+  create(@Param('eventId') eventIdentifier: string, @Body() body: unknown) {
+    return this.guests.create(eventIdentifier, body);
   }
 
   @Patch('guests/:guestId')
