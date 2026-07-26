@@ -35,6 +35,25 @@ export const publicEventSchema = z.object({
 
 export type PublicEvent = z.infer<typeof publicEventSchema>;
 
+export const publicEventPreviewSchema = publicEventSchema.pick({
+  celebrantName: true,
+  celebrantAge: true,
+  locale: true,
+  publicSlug: true,
+  templateKey: true,
+  templateVersion: true,
+});
+
+export const hostEventSummarySchema = z.object({
+  id: z.uuid(),
+  title: z.string().min(1),
+  publicSlug: z.string().min(1),
+  primaryHostname: z.string().min(1).nullable(),
+});
+
+export type PublicEventPreview = z.infer<typeof publicEventPreviewSchema>;
+export type HostEventSummary = z.infer<typeof hostEventSummarySchema>;
+
 export function normalizeHostname(value: string): string {
   return value.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }

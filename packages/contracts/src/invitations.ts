@@ -129,9 +129,22 @@ export const publicInvitationSchema = z.object({
   }),
 });
 
+export const invitationLookupRequestSchema = z.object({
+  publicSlug: z.string().trim().min(1).max(160),
+  displayName: z.string().trim().min(1).max(160),
+  contact: z.string().trim().min(3).max(254),
+});
+
+export const invitationAccessGrantSchema = z.object({
+  grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  expiresAt: z.iso.datetime(),
+});
+
 export type CreateGuestInput = z.infer<typeof createGuestInputSchema>;
 export type HostGuest = z.infer<typeof hostGuestSchema>;
 export type InvitationSummary = z.infer<typeof invitationSummarySchema>;
 export type CreateInvitationResult = z.infer<typeof createInvitationResultSchema>;
 export type RegenerateInvitationResult = z.infer<typeof regenerateInvitationResultSchema>;
 export type PublicInvitation = z.infer<typeof publicInvitationSchema>;
+export type InvitationLookupRequest = z.infer<typeof invitationLookupRequestSchema>;
+export type InvitationAccessGrant = z.infer<typeof invitationAccessGrantSchema>;

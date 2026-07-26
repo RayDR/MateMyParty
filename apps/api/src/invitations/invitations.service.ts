@@ -111,27 +111,35 @@ export class InvitationsService {
         this.tokens.matches(candidate.publicTokenHash, expectedHash),
       );
       if (!invitation || invitation.revokedAt) throw this.publicNotFound();
-      const openedPreviously = invitation.openCount > 0;
-      const details = await this.repository.publicDetails(invitation.id, executor);
-      if (!details) throw this.publicNotFound();
-      const now = new Date();
-      const opened = await this.repository.recordOpen(invitation.id, now, executor);
-      if (!opened) throw this.publicNotFound();
-      await this.repository.addActivity(invitation.id, 'OPENED', metadata, executor);
-      const event = details.event;
-      return publicInvitationSchema.parse({
-        event: publicEventSchema.parse({
-          ...event,
-          startsAt: event.startsAt.toISOString(),
-          endsAt: event.endsAt?.toISOString() ?? null,
-          rsvpDeadline: event.rsvpDeadline?.toISOString() ?? null,
-        }),
-        guestDisplayName: details.guest.displayName,
-        status: opened.status,
-        locale: opened.locale,
-        openedPreviously,
-        capabilities: { canRespond: false, canAddToCalendar: false },
-      });
+      return this.resolveInvitationAndTrack(invitation.id, metadata, executor);
+    });
+  }
+
+  async resolveInvitationAndTrack(
+    invitationId: string,
+    metadata: Record<string, string>,
+    executor: DatabaseExecutor,
+  ): Promise<PublicInvitation> {
+    const details = await this.repository.publicDetails(invitationId, executor);
+    if (!details || details.invitation.revokedAt || details.guest.archivedAt)
+      throw this.publicNotFound();
+    const openedPreviously = details.invitation.openCount > 0;
+    const opened = await this.repository.recordOpen(invitationId, new Date(), executor);
+    if (!opened) throw this.publicNotFound();
+    await this.repository.addActivity(invitationId, 'OPENED', metadata, executor);
+    const event = details.event;
+    return publicInvitationSchema.parse({
+      event: publicEventSchema.parse({
+        ...event,
+        startsAt: event.startsAt.toISOString(),
+        endsAt: event.endsAt?.toISOString() ?? null,
+        rsvpDeadline: event.rsvpDeadline?.toISOString() ?? null,
+      }),
+      guestDisplayName: details.guest.displayName,
+      status: opened.status,
+      locale: opened.locale,
+      openedPreviously,
+      capabilities: { canRespond: false, canAddToCalendar: false },
     });
   }
 

@@ -48,5 +48,9 @@
   "loadError": "Guests could not be loaded.",
   "actionError": "The operation could not be completed.",
   "archived": "Archived",
-  "active": "Active"
+  "active": "Active",
+  "eventsTitle": "Your events",
+  "eventsDescription": "Choose an event to manage its guests.",
+  "openGuestManagement": "Manage guests",
+  "noEvents": "No events are available for this temporary host account."
 }

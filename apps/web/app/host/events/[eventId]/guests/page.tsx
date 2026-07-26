@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
-import { getDictionary, isLocale } from '@matemyparty/i18n';
 import { HostAccess } from '../../../../../components/host-access';
 import { HostGuestPanel } from '../../../../../components/host-guest-panel';
 import { HOST_SESSION_COOKIE, validSessionValue } from '../../../../../lib/host-session';
+import { resolveRequestLocale } from '../../../../../lib/locale';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,17 +11,16 @@ export default async function HostGuestsPage({
   searchParams,
 }: {
   params: Promise<{ eventId: string }>;
-  searchParams: Promise<{ accessError?: string; locale?: string }>;
+  searchParams: Promise<{ accessError?: string }>;
 }) {
   const { eventId } = await params;
   const query = await searchParams;
-  const locale = query.locale && isLocale(query.locale) ? query.locale : 'en-US';
-  const dictionary = getDictionary(locale);
+  const locale = await resolveRequestLocale();
   const hasCookie = validSessionValue((await cookies()).get(HOST_SESSION_COOKIE)?.value ?? '');
   const returnTo = `/host/events/${eventId}/guests`;
   return hasCookie ? (
-    <HostGuestPanel eventId={eventId} />
+    <HostGuestPanel eventId={eventId} initialLocale={locale} />
   ) : (
-    <HostAccess dictionary={dictionary} returnTo={returnTo} invalid={query.accessError === '1'} />
+    <HostAccess locale={locale} returnTo={returnTo} invalid={query.accessError === '1'} />
   );
 }

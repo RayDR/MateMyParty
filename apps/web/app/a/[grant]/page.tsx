@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getDictionary } from '@matemyparty/i18n';
 import { InvalidInvitation, PublicInvitation } from '../../../components/public-invitation';
-import { getPublicInvitation } from '../../../lib/invitations';
+import { getInvitationByGrant } from '../../../lib/invitations';
 import { resolveRequestLocale } from '../../../lib/locale';
 
 export const dynamic = 'force-dynamic';
@@ -16,8 +16,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
-  const invitation = await getPublicInvitation((await params).token);
+export default async function InvitationAccessPage({
+  params,
+}: {
+  params: Promise<{ grant: string }>;
+}) {
+  const invitation = await getInvitationByGrant((await params).grant);
   const locale = await resolveRequestLocale({
     invitationLocale: invitation?.locale,
     eventLocale: invitation?.event.locale,

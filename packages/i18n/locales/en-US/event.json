@@ -6,5 +6,13 @@
   "venue": "Venue",
   "invitationSoon": "The complete invitation will be available soon.",
   "age": "Turning {age}",
-  "datePending": "To be confirmed"
+  "datePending": "To be confirmed",
+  "publicHeading": "{name} is turning {age}",
+  "lookupTitle": "Find your private invitation",
+  "lookupDescription": "Enter the invited person or family name and the full email address or phone number on the invitation.",
+  "lookupName": "Invited person or family name",
+  "lookupContact": "Full email address or phone number",
+  "lookupSubmit": "Open private invitation",
+  "lookupFailure": "We could not verify the invitation. Check both entries and try again.",
+  "backgroundVideo": "Dragon background video"
 }

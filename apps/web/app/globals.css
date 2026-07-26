@@ -90,8 +90,13 @@ body {
   .dragon-pulse::before,
   .dragon-pulse::after,
   .dragon-eye,
-  .dragon-media-transition {
+  .dragon-media-transition,
+  .birthday-video {
     animation: none;
     transition: none;
+  }
+
+  .birthday-video {
+    display: none;
   }
 }

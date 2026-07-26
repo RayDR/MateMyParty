@@ -197,6 +197,25 @@ export const invitations = pgTable(
   ],
 );
 
+export const invitationAccessGrants = pgTable(
+  'invitation_access_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    invitationId: uuid('invitation_id')
+      .notNull()
+      .references(() => invitations.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
+  },
+  (table) => [
+    uniqueIndex('invitation_access_grants_token_hash_unique').on(table.tokenHash),
+    index('invitation_access_grants_invitation_id_index').on(table.invitationId),
+    index('invitation_access_grants_expires_at_index').on(table.expiresAt),
+  ],
+);
+
 export const invitationActivities = pgTable(
   'invitation_activities',
   {

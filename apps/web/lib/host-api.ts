@@ -1,4 +1,7 @@
+import 'server-only';
+
 import { NextResponse, type NextRequest } from 'next/server';
+import { hostEventSummarySchema, type HostEventSummary } from '@matemyparty/contracts';
 import { validHostSession } from './host-session';
 import { internalApiBaseUrl } from './server-api';
 
@@ -34,4 +37,15 @@ export async function forwardHostRequest(
     status: upstream.status,
     headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },
   });
+}
+
+export async function getHostEvents(): Promise<HostEventSummary[]> {
+  const token = process.env.HOST_ADMIN_TOKEN;
+  if (!token) return [];
+  const response = await fetch(`${internalApiBaseUrl}/api/host/events`, {
+    cache: 'no-store',
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`Host events API failed with status ${response.status}`);
+  return hostEventSummarySchema.array().parse(await response.json());
 }

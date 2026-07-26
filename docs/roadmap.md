@@ -5,6 +5,7 @@
 - [x] Unguessable, hashed, revocable invitation links.
 - [x] Personalized public invitation pages.
 - [x] Temporary host panel.
+- [ ] Replace temporary host-token access with authenticated accounts and list every event owned by the signed-in user in the generic MateMyParty portal.
 - [x] Initial open tracking.
 - [ ] **Current milestone: prepare RSVP responses, party sizes, and dietary notes.**
 - [ ] Visual invitation templates and envelope animation.

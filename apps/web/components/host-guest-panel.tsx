@@ -4,12 +4,19 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import type { HostGuest } from '@matemyparty/contracts';
 import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
+import { LanguageSelector } from './language-selector';
 
 type Filter = 'all' | 'without' | 'notOpened' | 'opened' | 'archived';
 type InvitationResult = { invitation: NonNullable<HostGuest['invitation']>; publicUrl: string };
 
-export function HostGuestPanel({ eventId }: { eventId: string }) {
-  const [locale, setLocale] = useState<Locale>('en-US');
+export function HostGuestPanel({
+  eventId,
+  initialLocale = 'en-US',
+}: {
+  eventId: string;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
   const [guests, setGuests] = useState<HostGuest[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<HostGuest | null>(null);
@@ -116,17 +123,7 @@ export function HostGuestPanel({ eventId }: { eventId: string }) {
             <h1 className="text-3xl font-black">{dictionary.host.title}</h1>
             <p className="mt-2 text-xs text-amber-200">{dictionary.host.provisionalWarning}</p>
           </div>
-          <label className="text-sm">
-            {dictionary.host.language}
-            <select
-              value={locale}
-              onChange={(event) => setLocale(event.target.value as Locale)}
-              className="ml-3 rounded-lg bg-slate-800 p-2"
-            >
-              <option value="en-US">{dictionary.common.english}</option>
-              <option value="es-MX">{dictionary.common.spanish}</option>
-            </select>
-          </label>
+          <LanguageSelector locale={locale} dictionary={dictionary} onChange={setLocale} />
         </header>
         {error ? (
           <p className="mb-4 rounded-xl bg-red-500/15 p-3 text-red-200">

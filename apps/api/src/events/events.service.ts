@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  hostEventSummarySchema,
   normalizeHostname,
   normalizeSlug,
-  publicEventSchema,
-  type PublicEvent,
+  publicEventPreviewSchema,
+  type HostEventSummary,
+  type PublicEventPreview,
 } from '@matemyparty/contracts';
 import { EventsRepository } from './events.repository';
 
@@ -11,21 +13,24 @@ import { EventsRepository } from './events.repository';
 export class EventsService {
   constructor(private readonly repository: EventsRepository) {}
 
-  async byHostname(rawHostname: string): Promise<PublicEvent> {
+  async byHostname(rawHostname: string): Promise<PublicEventPreview> {
     return this.toPublicEvent(await this.repository.findByHostname(normalizeHostname(rawHostname)));
   }
 
-  async bySlug(rawSlug: string): Promise<PublicEvent> {
+  async bySlug(rawSlug: string): Promise<PublicEventPreview> {
     return this.toPublicEvent(await this.repository.findBySlug(normalizeSlug(rawSlug)));
   }
 
-  private toPublicEvent(row: Awaited<ReturnType<EventsRepository['findBySlug']>>): PublicEvent {
+  async listForHost(): Promise<HostEventSummary[]> {
+    return (await this.repository.listForHost()).map((event) =>
+      hostEventSummarySchema.parse(event),
+    );
+  }
+
+  private toPublicEvent(
+    row: Awaited<ReturnType<EventsRepository['findBySlug']>>,
+  ): PublicEventPreview {
     if (!row) throw new NotFoundException('Event not found');
-    return publicEventSchema.parse({
-      ...row,
-      startsAt: row.startsAt.toISOString(),
-      endsAt: row.endsAt?.toISOString() ?? null,
-      rsvpDeadline: row.rsvpDeadline?.toISOString() ?? null,
-    });
+    return publicEventPreviewSchema.parse(row);
   }
 }

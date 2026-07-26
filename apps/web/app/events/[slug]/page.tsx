@@ -1,6 +1,6 @@
-import { EventInvitation } from '../../../components/event-invitation';
+import { BirthdayHomepage } from '../../../components/birthday-homepage';
 import { getEventBySlug } from '../../../lib/events';
-import { resolveLocale } from '../../../lib/locale';
+import { resolveRequestLocale } from '../../../lib/locale';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,10 +9,16 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ locale?: string | string[] }>;
+  searchParams: Promise<{ lookupError?: string }>;
 }) {
   const { slug } = await params;
   const event = await getEventBySlug(slug);
-  const locale = resolveLocale((await searchParams).locale, event.locale);
-  return <EventInvitation event={event} locale={locale} />;
+  const locale = await resolveRequestLocale({ eventLocale: event.locale });
+  return (
+    <BirthdayHomepage
+      event={event}
+      locale={locale}
+      lookupFailed={(await searchParams).lookupError === '1'}
+    />
+  );
 }

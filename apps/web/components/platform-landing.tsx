@@ -5,8 +5,8 @@ import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
 import { LanguageSelector } from './language-selector';
 
-export function PlatformLanding() {
-  const [locale, setLocale] = useState<Locale>('en-US');
+export function PlatformLanding({ initialLocale = 'en-US' }: { initialLocale?: Locale }) {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
   const dictionary = getDictionary(locale);
   return (
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#312e81,#020617_62%)] p-5">

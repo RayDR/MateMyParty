@@ -6,5 +6,13 @@
   "venue": "Lugar",
   "invitationSoon": "La invitación completa estará disponible pronto.",
   "age": "Cumple {age}",
-  "datePending": "Por confirmar"
+  "datePending": "Por confirmar",
+  "publicHeading": "{name} cumple {age} años",
+  "lookupTitle": "Encuentra tu invitación privada",
+  "lookupDescription": "Ingresa el nombre de la persona o familia invitada y el correo electrónico completo o teléfono de la invitación.",
+  "lookupName": "Nombre de la persona o familia invitada",
+  "lookupContact": "Correo electrónico completo o teléfono",
+  "lookupSubmit": "Abrir invitación privada",
+  "lookupFailure": "No pudimos verificar la invitación. Revisa ambos datos e inténtalo de nuevo.",
+  "backgroundVideo": "Video de fondo de dragones"
 }

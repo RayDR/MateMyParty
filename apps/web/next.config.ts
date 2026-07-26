@@ -6,12 +6,16 @@ const privateHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  logging: { incomingRequests: { ignore: [/^\/i\//, /^\/private-media\//] } },
+  logging: { incomingRequests: { ignore: [/^\/i\//, /^\/a\//, /^\/private-media\//] } },
   transpilePackages: ['@matemyparty/contracts', '@matemyparty/i18n', '@matemyparty/ui'],
   async headers() {
     return [
       {
         source: '/i/:path*',
+        headers: privateHeaders,
+      },
+      {
+        source: '/a/:path*',
         headers: privateHeaders,
       },
       {

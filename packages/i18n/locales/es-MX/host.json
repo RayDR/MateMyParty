@@ -48,5 +48,9 @@
   "loadError": "No se pudieron cargar los invitados.",
   "actionError": "No se pudo completar la operación.",
   "archived": "Archivado",
-  "active": "Activo"
+  "active": "Activo",
+  "eventsTitle": "Tus eventos",
+  "eventsDescription": "Elige un evento para administrar sus invitados.",
+  "openGuestManagement": "Administrar invitados",
+  "noEvents": "No hay eventos disponibles para esta cuenta temporal de anfitrión."
 }

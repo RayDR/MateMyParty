@@ -4,6 +4,7 @@ import {
   normalizeEmail,
   normalizePhone,
   publicInvitationSchema,
+  invitationLookupRequestSchema,
 } from './invitations.js';
 
 const base = { displayName: ' Family Sample ', locale: 'en-US' as const };
@@ -33,6 +34,17 @@ describe('guest validation', () => {
     expect(() =>
       createGuestInputSchema.parse({ ...base, preferredChannel: 'MANUAL', adultsPlanned: -1 }),
     ).toThrow();
+  });
+});
+
+describe('invitation lookup validation', () => {
+  it('requires both an invited name and contact value', () => {
+    expect(
+      invitationLookupRequestSchema.safeParse({
+        publicSlug: 'raymundo-6',
+        displayName: 'Family Sample',
+      }).success,
+    ).toBe(false);
   });
 });
 

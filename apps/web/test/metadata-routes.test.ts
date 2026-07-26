@@ -7,14 +7,16 @@ describe('metadata routes', () => {
     const result = robots();
     const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
 
-    expect(rules[0]?.disallow).toEqual(['/i/', '/private-media/']);
+    expect(rules[0]?.disallow).toEqual(['/i/', '/a/', '/private-media/']);
   });
 
   it('does not publish invitation or private media paths in the sitemap', () => {
     const urls = sitemap().map((entry) => entry.url);
 
-    expect(urls.every((url) => !url.includes('/i/') && !url.includes('/private-media/'))).toBe(
-      true,
-    );
+    expect(
+      urls.every(
+        (url) => !url.includes('/i/') && !url.includes('/a/') && !url.includes('/private-media/'),
+      ),
+    ).toBe(true);
   });
 });

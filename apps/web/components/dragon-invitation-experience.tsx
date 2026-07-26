@@ -19,9 +19,11 @@ type ExperienceLabels = {
 
 export function DragonInvitationExperience({
   labels,
+  toolbar,
   children,
 }: {
   labels: ExperienceLabels;
+  toolbar?: ReactNode;
   children: ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -121,6 +123,8 @@ export function DragonInvitationExperience({
       />
 
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(29,214,181,0.13),transparent_22%),linear-gradient(180deg,rgba(1,7,13,0.18),rgba(1,6,13,0.9))]" />
+
+      {toolbar ? <div className="fixed left-4 top-4 z-40">{toolbar}</div> : null}
 
       {(!entered || videoUnavailable) && (
         <div className="dragon-pulse fixed inset-0" aria-label={labels.fallback}>

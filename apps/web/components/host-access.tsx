@@ -1,18 +1,23 @@
-import type { Dictionary } from '@matemyparty/i18n';
+import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
+import { LanguageSelector } from './language-selector';
 
 export function HostAccess({
-  dictionary,
+  locale,
   returnTo,
   invalid,
 }: {
-  dictionary: Dictionary;
+  locale: Locale;
   returnTo: string;
   invalid: boolean;
 }) {
+  const dictionary = getDictionary(locale);
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 p-5 text-white">
       <div className="w-full max-w-md">
+        <div className="mb-5 flex justify-end">
+          <LanguageSelector locale={locale} dictionary={dictionary} />
+        </div>
         <Card>
           <h1 className="text-3xl font-bold">{dictionary.host.accessTitle}</h1>
           <p className="mt-3 text-slate-300">{dictionary.host.accessDescription}</p>
@@ -21,7 +26,12 @@ export function HostAccess({
               {dictionary.host.invalidToken}
             </p>
           ) : null}
-          <form action="/host/access" method="post" className="mt-6 space-y-4">
+          <form
+            action="/host/access/submit"
+            method="post"
+            aria-label={dictionary.host.accessTitle}
+            className="mt-6 space-y-4"
+          >
             <input type="hidden" name="returnTo" value={returnTo} />
             <label className="block">
               <span className="text-sm text-slate-200">{dictionary.host.tokenLabel}</span>

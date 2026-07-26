@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/i/', '/private-media/'],
+      disallow: ['/i/', '/a/', '/private-media/'],
     },
     sitemap: `${protocol}://${hostname}/sitemap.xml`,
   };

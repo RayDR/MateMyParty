@@ -1,23 +1,31 @@
 import type { PublicInvitation as PublicInvitationData } from '@matemyparty/contracts';
-import { getDictionary } from '@matemyparty/i18n';
+import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
 import { DragonInvitationExperience } from './dragon-invitation-experience';
+import { LanguageSelector } from './language-selector';
 
-export function PublicInvitation({ invitation }: { invitation: PublicInvitationData }) {
-  const dictionary = getDictionary(invitation.locale);
+export function PublicInvitation({
+  invitation,
+  locale = invitation.locale,
+}: {
+  invitation: PublicInvitationData;
+  locale?: Locale;
+}) {
+  const dictionary = getDictionary(locale);
   const { event } = invitation;
   const startsAt = new Date(event.startsAt);
-  const date = new Intl.DateTimeFormat(invitation.locale, {
+  const date = new Intl.DateTimeFormat(locale, {
     dateStyle: 'full',
     timeZone: event.timezone,
   }).format(startsAt);
-  const time = new Intl.DateTimeFormat(invitation.locale, {
+  const time = new Intl.DateTimeFormat(locale, {
     timeStyle: 'short',
     timeZone: event.timezone,
   }).format(startsAt);
 
   return (
     <DragonInvitationExperience
+      toolbar={<LanguageSelector locale={locale} dictionary={dictionary} />}
       labels={{
         enter: dictionary.invitation.enterDragonWorld,
         fallback: dictionary.invitation.fallbackExperience,
@@ -84,11 +92,16 @@ function Detail({ label, value }: { label: string; value: string }) {
 export function InvalidInvitation({ locale = 'en-US' }: { locale?: 'en-US' | 'es-MX' }) {
   const dictionary = getDictionary(locale);
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
-      <Card>
-        <h1 className="text-3xl font-bold">{dictionary.invitation.invalidTitle}</h1>
-        <p className="mt-4 max-w-md text-slate-300">{dictionary.invitation.invalidMessage}</p>
-      </Card>
+    <main className="min-h-screen bg-slate-950 p-6 text-white">
+      <div className="mx-auto flex max-w-2xl justify-end">
+        <LanguageSelector locale={locale} dictionary={dictionary} />
+      </div>
+      <div className="flex min-h-[calc(100vh-6rem)] items-center justify-center text-center">
+        <Card>
+          <h1 className="text-3xl font-bold">{dictionary.invitation.invalidTitle}</h1>
+          <p className="mt-4 max-w-md text-slate-300">{dictionary.invitation.invalidMessage}</p>
+        </Card>
+      </div>
     </main>
   );
 }
