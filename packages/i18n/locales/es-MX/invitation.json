@@ -3,5 +3,7 @@
   "preparedFor": "Esta invitación fue preparada para {guestName}.",
   "rsvpSoon": "La confirmación de asistencia estará disponible pronto.",
   "invalidTitle": "Esta invitación no está disponible",
-  "invalidMessage": "Es posible que el enlace no sea válido, haya vencido o ya no esté activo."
+  "invalidMessage": "Es posible que el enlace no sea válido, haya vencido o ya no esté activo.",
+  "enterDragonWorld": "Entrar al mundo de los dragones",
+  "fallbackExperience": "Señal de Furia Nocturna detectada"
 }
