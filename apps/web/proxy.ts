@@ -10,6 +10,8 @@ export function proxy(request: NextRequest) {
   const local = hostname === 'localhost' || hostname === '127.0.0.1';
   if (!hostname || local || hostname === primary) return NextResponse.next();
   const url = request.nextUrl.clone();
+  // The public request may be HTTPS, but this rewrite is handled by the local HTTP Next server.
+  url.protocol = 'http:';
   url.pathname = `/site-hosts/${encodeURIComponent(hostname)}`;
   return NextResponse.rewrite(url);
 }
