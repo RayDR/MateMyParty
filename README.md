@@ -17,6 +17,11 @@ See [docs/architecture.md](docs/architecture.md) for boundaries and decisions.
 
 The public platform hostname is `matemyparty.domoforge.com`; the first event remains available through `raymundo6th.domoforge.com` and the local `/events/raymundo-6` route.
 
+Production URLs, after DNS and TLS deployment, are:
+
+- `https://matemyparty.domoforge.com/` for the generic platform landing.
+- `https://raymundo6th.domoforge.com/` for Raymundo's birthday event.
+
 ## Requirements
 
 - Node.js 22 or newer
@@ -32,7 +37,7 @@ pnpm install
 cp .env.example .env
 ```
 
-The example credentials are local-development values only. Every variable is documented in `.env.example`; change them for any shared environment. Generate a private host token before shared or production use, for example with `openssl rand -base64 32`. Next reads `NEXT_PUBLIC_API_BASE_URL` at build/runtime, while database access remains API-only. `HOST_ADMIN_TOKEN` must never use a `NEXT_PUBLIC_` prefix.
+The example credentials are local-development values only. Every variable is documented in `.env.example`; change them for any shared environment. Generate a private host token before shared or production use, for example with `openssl rand -hex 48`. Next reads `INTERNAL_API_BASE_URL` only on the server, while database access remains API-only. `HOST_ADMIN_TOKEN` must never use a `NEXT_PUBLIC_` prefix.
 
 ## Local development
 
@@ -138,7 +143,7 @@ See [docs/security.md](docs/security.md) before exposing any environment publicl
 
 Feature work branches from `develop` into `feature/*`, merges back through review, and reaches `main` only as a stable release. Hotfixes branch from `main`. See [docs/git-workflow.md](docs/git-workflow.md).
 
-The initial production target is one Ubuntu VPS with PostgreSQL, two systemd services, and nginx handling both public hostnames, TLS, API routing, and future websocket upgrades. See [docs/deployment.md](docs/deployment.md) and the examples under `deploy/`.
+The initial production target is one Ubuntu VPS with PostgreSQL, two systemd application services, a backup timer, and Nginx handling both public hostnames, TLS, API routing, and future websocket upgrades. See [deployment](docs/deployment.md), [operations](docs/operations.md), [DNS](docs/dns.md), and [backup and restore](docs/backup-and-restore.md), plus the examples under `deploy/`.
 
 ## License
 
