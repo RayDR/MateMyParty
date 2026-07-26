@@ -8,14 +8,14 @@ The 2026-07-26 inspection found:
 
 - Ubuntu 24.04.3 LTS, 8 vCPUs, 15 GiB RAM, and 326 GiB available disk.
 - Shell Node.js 22.17.0 and pnpm 11.17.0 are provided by the `sysops` NVM installation.
-- System Node.js is still 18.19.1 and must be upgraded before installing the units.
+- System Node.js 18.19.1 remains in use by unrelated services. MateMyParty uses an isolated Node.js 22.17.0 and pnpm 11.17.0 runtime under `/opt/matemyparty/runtime`.
 - PostgreSQL 16.14, Nginx 1.24.0, systemd 255, Certbot 2.9.0, and UFW are active.
 - Port 3000 belongs to an unrelated `/opt/pzwebadmin` service. MateMyParty therefore uses `127.0.0.1:3200` for web and `127.0.0.1:3001` for API.
 - PostgreSQL currently listens on all interfaces. Its firewall exposure and remote consumers must be audited before changing `listen_addresses`.
-- Both public hostnames still resolve to `74.208.236.82`, not this VPS at `66.179.210.180`. Production TLS and public validation are blocked until DNS is corrected.
+- Both public hostnames now resolve to this VPS at `66.179.210.180`, with no published AAAA records.
 - The current operator does not have passwordless sudo. Privileged provisioning commands below require an interactive sudo session.
 
-The direct-repository approach matches the existing `/forge` convention and avoids premature release-directory machinery. Git pins every deployment to `origin/main`, a release tag, or an explicit commit already contained in `origin/main`; `/var/lib/matemyparty/previous-commit` records the rollback target.
+The direct-repository approach matches the existing `/forge` convention and avoids premature release-directory machinery. Git pins a production deployment to `origin/main` or a release tag. A pre-release deployment may target `origin/develop` or an explicit commit already contained in `origin/develop`; `/var/lib/matemyparty/previous-commit` records the rollback target.
 
 ## 1. DNS gate
 
@@ -23,15 +23,16 @@ Complete [dns.md](dns.md) first. Do not request a certificate while either hostn
 
 ## 2. System runtime and service account
 
-Install system-wide Node.js 22 so systemd does not depend on a user's NVM directory:
+Copy the reviewed Node.js 22 runtime into an application-owned system location. This avoids changing `/usr/bin/node`, which unrelated services still use, and avoids making systemd depend on a user's NVM directory:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-sudo corepack enable
-sudo corepack prepare pnpm@11.17.0 --activate
-/usr/bin/node --version
-/usr/bin/pnpm --version
+sudo install -d -m 0755 -o root -g root /opt/matemyparty
+sudo cp -a /home/sysops/.nvm/versions/node/v22.17.0 /opt/matemyparty/runtime
+sudo chown -R root:root /opt/matemyparty/runtime
+sudo chmod -R go-w /opt/matemyparty/runtime
+/opt/matemyparty/runtime/bin/node --version
+PATH=/opt/matemyparty/runtime/bin:/usr/bin:/bin \
+  /opt/matemyparty/runtime/bin/pnpm --version
 ```
 
 Create a locked service account and grant read access through the existing `release` group:
@@ -233,7 +234,13 @@ Run the checks in [operations.md](operations.md), [backup-and-restore.md](backup
 sudo /forge/matemyparty/deploy/scripts/deploy.sh --ref main
 ```
 
-The script fetches safely, rejects a dirty tree or non-`main` commit, validates, builds, creates a pre-migration backup, migrates, restarts both services, and checks loopback health. It does not merge, push, run down migrations, or seed guests.
+An explicitly authorized pre-release deployment can instead use the current `develop` tip without merging it to `main`:
+
+```bash
+sudo /forge/matemyparty/deploy/scripts/deploy.sh --ref develop
+```
+
+The script fetches safely, rejects a dirty tree or a commit outside the selected upstream, validates, builds, creates a pre-migration backup, migrates, restarts both services, and checks loopback health. It does not merge, push, run down migrations, or seed guests.
 
 ## Acceptance checklist
 

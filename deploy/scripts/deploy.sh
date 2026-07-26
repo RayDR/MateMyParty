@@ -7,9 +7,12 @@ readonly REPOSITORY_DIRECTORY="/forge/matemyparty"
 readonly ENVIRONMENT_FILE="/etc/matemyparty/matemyparty.env"
 readonly DEPLOYMENT_STATE_DIRECTORY="/var/lib/matemyparty"
 readonly DEPLOY_USER="sysops"
+readonly RUNTIME_DIRECTORY="/opt/matemyparty/runtime"
+readonly NODE_BINARY="${RUNTIME_DIRECTORY}/bin/node"
+readonly PNPM_BINARY="${RUNTIME_DIRECTORY}/bin/pnpm"
 
 usage() {
-  echo "Usage: sudo $0 --ref <main|vX.Y.Z|40-character-commit>" >&2
+  echo "Usage: sudo $0 --ref <main|develop|vX.Y.Z|40-character-commit>" >&2
 }
 
 die() {
@@ -19,6 +22,12 @@ die() {
 
 run_as_deployer() {
   runuser --user "${DEPLOY_USER}" -- "$@"
+}
+
+run_pnpm() {
+  run_as_deployer /usr/bin/env \
+    "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
+    "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" "$@"
 }
 
 if [[ ${EUID} -ne 0 ]]; then
@@ -33,8 +42,8 @@ fi
 requested_ref="$2"
 [[ -d "${REPOSITORY_DIRECTORY}/.git" ]] || die "repository not found"
 [[ -r "${ENVIRONMENT_FILE}" ]] || die "production environment file not found"
-[[ -x /usr/bin/node ]] || die "system Node.js is not installed"
-[[ -x /usr/bin/pnpm ]] || die "system pnpm is not installed"
+[[ -x "${NODE_BINARY}" ]] || die "isolated Node.js runtime is not installed"
+[[ -x "${PNPM_BINARY}" ]] || die "isolated pnpm runtime is not installed"
 
 if [[ -n $(git -C "${REPOSITORY_DIRECTORY}" status --porcelain) ]]; then
   die "repository working tree is not clean"
@@ -45,15 +54,22 @@ run_as_deployer git -C "${REPOSITORY_DIRECTORY}" fetch --prune --tags origin
 case "${requested_ref}" in
   main)
     target_ref="refs/remotes/origin/main"
+    allowed_upstream="refs/remotes/origin/main"
+    ;;
+  develop)
+    target_ref="refs/remotes/origin/develop"
+    allowed_upstream="refs/remotes/origin/develop"
     ;;
   v[0-9]*.[0-9]*.[0-9]*)
     target_ref="refs/tags/${requested_ref}"
+    allowed_upstream="refs/remotes/origin/main"
     ;;
   *)
     if [[ ${requested_ref} =~ ^[0-9a-f]{40}$ ]]; then
       target_ref="${requested_ref}"
+      allowed_upstream="refs/remotes/origin/develop"
     else
-      die "ref must be main, a semantic version tag, or a full commit SHA"
+      die "ref must be main, develop, a semantic version tag, or a full commit SHA"
     fi
     ;;
 esac
@@ -61,20 +77,20 @@ esac
 target_commit="$(git -C "${REPOSITORY_DIRECTORY}" rev-parse --verify "${target_ref}^{commit}")" ||
   die "requested ref does not resolve to a commit"
 git -C "${REPOSITORY_DIRECTORY}" merge-base --is-ancestor \
-  "${target_commit}" refs/remotes/origin/main ||
-  die "requested commit is not part of origin/main"
+  "${target_commit}" "${allowed_upstream}" ||
+  die "requested commit is not part of ${allowed_upstream}"
 
 previous_commit="$(git -C "${REPOSITORY_DIRECTORY}" rev-parse HEAD)"
 install -d -m 0750 -o root -g root "${DEPLOYMENT_STATE_DIRECTORY}"
 printf '%s\n' "${previous_commit}" >"${DEPLOYMENT_STATE_DIRECTORY}/previous-commit"
 
 run_as_deployer git -C "${REPOSITORY_DIRECTORY}" switch --detach "${target_commit}"
-run_as_deployer /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" install --frozen-lockfile
-run_as_deployer /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" format:check
-run_as_deployer /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" lint
-run_as_deployer /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" typecheck
-run_as_deployer /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" test
-run_as_deployer /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" build
+run_pnpm install --frozen-lockfile
+run_pnpm format:check
+run_pnpm lint
+run_pnpm typecheck
+run_pnpm test
+run_pnpm build
 
 systemctl start matemyparty-backup.service
 
@@ -83,7 +99,8 @@ set -a
 source "${ENVIRONMENT_FILE}"
 set +a
 runuser --user "${DEPLOY_USER}" --whitelist-environment=DATABASE_URL -- \
-  /usr/bin/pnpm --dir "${REPOSITORY_DIRECTORY}" db:migrate
+  /usr/bin/env "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
+  "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" db:migrate
 
 systemctl restart matemyparty-api.service
 for attempt in {1..20}; do
