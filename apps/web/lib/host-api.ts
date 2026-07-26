@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { validHostSession } from './host-session';
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+import { internalApiBaseUrl } from './server-api';
 
 export async function forwardHostRequest(
   request: NextRequest,
@@ -21,7 +20,7 @@ export async function forwardHostRequest(
       { status: 503 },
     );
   const body = method === 'GET' || method === 'HEAD' ? undefined : await request.text();
-  const upstream = await fetch(`${apiBaseUrl}${path}`, {
+  const upstream = await fetch(`${internalApiBaseUrl}${path}`, {
     method,
     body,
     cache: 'no-store',

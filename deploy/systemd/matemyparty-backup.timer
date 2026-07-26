@@ -1,0 +1,11 @@
+[Unit]
+Description=Run MateMyParty PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=matemyparty-backup.service
+
+[Install]
+WantedBy=timers.target

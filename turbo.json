@@ -2,10 +2,12 @@
   "$schema": "https://turbo.build/schema.json",
   "globalPassThroughEnv": [
     "NODE_ENV",
+    "WEB_HOST",
     "WEB_PORT",
+    "API_HOST",
     "API_PORT",
     "DATABASE_URL",
-    "NEXT_PUBLIC_API_BASE_URL",
+    "INTERNAL_API_BASE_URL",
     "APP_VERSION",
     "DEFAULT_LOCALE",
     "SUPPORTED_LOCALES",

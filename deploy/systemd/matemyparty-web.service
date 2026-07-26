@@ -7,10 +7,11 @@ Wants=network-online.target
 Type=simple
 User=matemyparty
 Group=matemyparty
-WorkingDirectory=/opt/matemyparty
+SupplementaryGroups=release
+WorkingDirectory=/forge/matemyparty/apps/web
 EnvironmentFile=/etc/matemyparty/matemyparty.env
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/env pnpm --filter @matemyparty/web start
+ExecStartPre=/usr/bin/test -r /forge/matemyparty/apps/web/.next/BUILD_ID
+ExecStart=/usr/bin/node /forge/matemyparty/apps/web/node_modules/next/dist/bin/next start --hostname ${WEB_HOST} --port ${WEB_PORT}
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s
@@ -18,10 +19,17 @@ KillSignal=SIGTERM
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=matemyparty-web
+UMask=0027
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectHome=true
 ProtectSystem=full
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
 
 [Install]
 WantedBy=multi-user.target
