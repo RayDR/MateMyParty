@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   CalendarEvent,
   PrivateInvitation as PrivateInvitationData,
@@ -9,9 +9,21 @@ import type {
 } from '@matemyparty/contracts';
 import { richTextToHtml } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
-import { CalendarPlus, ChevronDown, Copy, MapPin, RotateCcw, Sparkles } from 'lucide-react';
+import {
+  CalendarPlus,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  HelpCircle,
+  MailOpen,
+  MapPin,
+  Pencil,
+  RotateCcw,
+  X,
+} from 'lucide-react';
 import { LanguageSelector } from './language-selector';
-import { ThemedInvitationStage } from './themed-invitation-stage';
+import { ThemedInvitationStage, type InvitationMediaHandle } from './themed-invitation-stage';
 import { EventCountdown } from './event-countdown';
 
 export function PublicInvitation({
@@ -32,9 +44,23 @@ export function PublicInvitation({
   const [locale, setLocale] = useState(initialLocale);
   const [opened, setOpened] = useState(false);
   const [calendar, setCalendar] = useState<CalendarEvent>(invitation.tools.calendar);
+  const media = useRef<InvitationMediaHandle>(null);
   const dictionary = getDictionary(locale);
   const { event } = invitation;
   const content = event.localizedContent[locale];
+  const fallbackContent = event.localizedContent[event.defaultLocale];
+  const localized = (value: string | null, fallback: string | null) =>
+    value?.trim() ? value : fallback?.trim() ? fallback : null;
+  const venueName = localized(content.venueName, fallbackContent.venueName);
+  const hostMessage = localized(content.hostMessage, fallbackContent.hostMessage);
+  const arrivalInstructions = localized(
+    content.arrivalInstructions,
+    fallbackContent.arrivalInstructions,
+  );
+  const parkingInstructions = localized(
+    content.parkingInstructions,
+    fallbackContent.parkingInstructions,
+  );
   const startsAt = new Date(event.startsAt);
   const dateTime = new Intl.DateTimeFormat(locale, {
     dateStyle: 'full',
@@ -79,6 +105,7 @@ export function PublicInvitation({
   }, [accessToken, locale, preview]);
   return (
     <ThemedInvitationStage
+      ref={media}
       presentation={event.presentation}
       dictionary={dictionary}
       privateExperience
@@ -90,7 +117,7 @@ export function PublicInvitation({
       <div
         lang={locale}
         data-invitation-side={opened ? 'back' : 'front'}
-        className="mx-auto min-h-screen max-w-5xl px-4 pb-32 pt-5 @md:px-8"
+        className="mx-auto min-h-screen max-w-5xl overflow-x-clip px-3 pb-44 pt-4 @md:px-8"
       >
         <header className="flex flex-wrap items-center justify-between gap-3">
           {preview ? (
@@ -103,149 +130,133 @@ export function PublicInvitation({
           <LanguageSelector locale={locale} dictionary={dictionary} onChange={setLocale} />
         </header>
         {!opened ? (
-          <article
-            className={`invitation-front invitation-reveal-${event.presentation.mode.toLowerCase()} mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950/72 shadow-2xl backdrop-blur-xl`}
-          >
+          <article className="invitation-front invitation-closed-card mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950 shadow-2xl">
             {event.presentation.thumbnailRef ? (
               <img
                 src={event.presentation.thumbnailRef}
                 alt={content.thumbnailAltText}
-                className="aspect-[4/3] max-h-[26rem] w-full object-cover"
+                className="aspect-[4/3] w-full object-cover"
               />
             ) : (
               <div className="aspect-[4/3] bg-[radial-gradient(circle_at_50%_30%,#155e75,#172554_48%,#020617)]" />
             )}
-            <div className="p-6 text-center @md:p-10">
-              <p className="text-sm font-bold tracking-[0.18em] text-amber-200">
-                {dictionary.invitation.youAreInvited}
-              </p>
-              <h1 className="mt-3 text-4xl font-black text-balance @md:text-6xl">
+            <div className="absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent px-5 pb-7 text-center @md:pb-10">
+              <h1 className="text-4xl font-black text-balance drop-shadow-2xl @md:text-6xl">
                 {content.celebrantName}
               </h1>
               {event.celebrantAge ? (
-                <p className="mt-2 text-lg text-cyan-100">
-                  {dictionary.event.age.replace('{age}', String(event.celebrantAge))}
+                <p className="mt-1 text-lg font-bold text-amber-100 drop-shadow-lg">
+                  {dictionary.invitation.turningAge.replace('{age}', String(event.celebrantAge))}
                 </p>
-              ) : null}
-              <p className="mt-6 text-lg text-slate-100">
-                {dictionary.invitation.preparedFor.replace(
-                  '{guestName}',
-                  invitation.guestDisplayName,
-                )}
-              </p>
-              {content.hostMessage ? (
-                <div className="rich-text invitation-front-message mt-5 text-slate-300">
-                  <RichText value={content.hostMessage} />
-                </div>
               ) : null}
               <button
                 type="button"
-                onClick={() => setOpened(true)}
-                className="mx-auto mt-7 inline-flex min-h-12 items-center gap-2 rounded-full bg-amber-300 px-6 py-3 font-black text-slate-950 shadow-xl transition hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+                title={dictionary.invitation.openInvitation}
+                aria-label={dictionary.invitation.openInvitation}
+                onClick={() => {
+                  void media.current?.unlockAudio();
+                  setOpened(true);
+                }}
+                className="mt-5 inline-flex size-14 items-center justify-center rounded-full bg-amber-300 text-slate-950 shadow-xl transition hover:scale-105 hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
               >
-                <Sparkles aria-hidden size={19} />
-                {dictionary.invitation.openInvitation}
+                <MailOpen aria-hidden size={23} />
               </button>
-              {event.presentation.audioRef ? (
-                <p className="mt-3 text-xs text-slate-400">
-                  {dictionary.invitation.audioAfterOpen}
-                </p>
-              ) : null}
             </div>
           </article>
         ) : (
-          <article className="invitation-back mx-auto mt-6 overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/76 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 @md:px-8">
+          <article
+            className={`invitation-back invitation-opening-${event.presentation.mode.toLowerCase()} relative mx-auto mt-5 overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/80 shadow-2xl backdrop-blur-xl`}
+          >
+            <div className="relative z-10 flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 @md:px-7">
               <div>
-                <p className="text-xs font-bold tracking-widest text-amber-200">
-                  {dictionary.event.birthday}
-                </p>
-                <h1 className="mt-1 text-2xl font-black @md:text-3xl">{content.title}</h1>
+                <h1 className="text-xl font-black text-balance @md:text-3xl">{content.title}</h1>
               </div>
               <button
                 type="button"
+                title={dictionary.invitation.viewFront}
+                aria-label={dictionary.invitation.viewFront}
                 onClick={() => setOpened(false)}
-                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold hover:bg-white/10"
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 hover:bg-white/10"
               >
                 <RotateCcw aria-hidden size={17} />
-                {dictionary.invitation.viewFront}
               </button>
             </div>
-            <div className="p-4 @md:p-8">
+            <div className="relative p-4 @md:p-8">
               <EventCountdown
                 startsAt={event.startsAt}
                 endsAt={event.endsAt}
                 dictionary={dictionary}
+                presentation="watermark"
               />
-              <Collapsible title={dictionary.invitation.eventDetails} defaultOpen>
-                <dl className="grid gap-x-8 gap-y-5 @md:grid-cols-2">
-                  <Detail label={dictionary.event.date} value={dateTime} />
-                  {endsAt ? <Detail label={dictionary.invitation.endTime} value={endsAt} /> : null}
-                  <Detail
-                    label={dictionary.event.venue}
-                    value={content.venueName ?? dictionary.event.datePending}
+              <section
+                aria-label={dictionary.invitation.eventDetails}
+                className="invitation-essential relative z-10 rounded-3xl border border-white/10 bg-slate-950/62 p-4 @md:p-6"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <Detail label={dictionary.invitation.when} value={dateTime} />
+                  <CalendarActions
+                    calendar={calendar}
+                    locale={locale}
+                    dictionary={dictionary}
+                    accessToken={accessToken}
+                    preview={preview}
                   />
+                </div>
+                {endsAt ? (
+                  <p className="mt-1 text-sm text-slate-300">
+                    {dictionary.invitation.endTime}: {endsAt}
+                  </p>
+                ) : null}
+                <div className="my-5 h-px bg-white/10" />
+                <div className="text-center">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
+                    {dictionary.invitation.where}
+                  </p>
+                  <p className="mt-2 text-xl font-black text-white">
+                    {venueName ?? dictionary.event.datePending}
+                  </p>
                   {address ? (
-                    <Detail label={dictionary.invitation.address} value={address} />
+                    <p className="mx-auto mt-1 max-w-xl text-slate-200">{address}</p>
                   ) : null}
-                  <Detail
-                    label={dictionary.invitation.invitedParty}
-                    value={partyLabel(invitation, dictionary)}
-                  />
-                </dl>
-              </Collapsible>
-              {invitation.tools.maps ? (
-                <Collapsible title={dictionary.invitation.locationAndDirections}>
-                  <MapActions maps={invitation.tools.maps} dictionary={dictionary} />
-                </Collapsible>
-              ) : null}
-              {content.arrivalInstructions || content.parkingInstructions ? (
-                <Collapsible title={dictionary.invitation.arrivalInformation}>
-                  {content.arrivalInstructions ? (
-                    <RichText value={content.arrivalInstructions} />
-                  ) : null}
-                  {content.parkingInstructions ? (
-                    <div className="mt-5 border-t border-white/10 pt-5">
-                      <h3 className="font-bold text-cyan-100">
-                        {dictionary.invitation.parkingInstructions}
-                      </h3>
-                      <RichText value={content.parkingInstructions} />
+                  {invitation.tools.maps ? (
+                    <div className="mt-4 flex justify-center">
+                      <MapActions maps={invitation.tools.maps} dictionary={dictionary} />
                     </div>
                   ) : null}
+                </div>
+                <div className="my-5 h-px bg-white/10" />
+                <Detail
+                  label={dictionary.invitation.invitedParty}
+                  value={invitation.guestDisplayName}
+                  supporting={partyLabel(invitation, dictionary)}
+                />
+              </section>
+              {arrivalInstructions ? (
+                <Collapsible title={dictionary.invitation.arrivalInstructions}>
+                  <RichText value={arrivalInstructions} />
                 </Collapsible>
               ) : null}
-              <Collapsible title={dictionary.invitation.calendarTitle}>
-                <CalendarActions
-                  calendar={calendar}
-                  locale={locale}
-                  dictionary={dictionary}
-                  accessToken={accessToken}
-                  preview={preview}
-                />
-              </Collapsible>
-              {content.hostMessage ? (
+              {parkingInstructions ? (
+                <Collapsible title={dictionary.invitation.parkingInstructions}>
+                  <RichText value={parkingInstructions} />
+                </Collapsible>
+              ) : null}
+              {hostMessage ? (
                 <Collapsible title={dictionary.invitation.hostMessageTitle}>
-                  <RichText value={content.hostMessage} />
+                  <RichText value={hostMessage} />
                 </Collapsible>
               ) : null}
-              <Collapsible title={dictionary.invitation.rsvpTitle} defaultOpen>
-                <RsvpPanel
-                  invitation={invitation}
-                  dictionary={dictionary}
-                  accessToken={accessToken}
-                  preview={preview}
-                />
-              </Collapsible>
-              <button
-                type="button"
-                onClick={() => setOpened(false)}
-                className="mx-auto mt-8 flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold"
-              >
-                <RotateCcw aria-hidden size={17} /> {dictionary.invitation.viewFront}
-              </button>
             </div>
           </article>
         )}
+        {opened ? (
+          <RsvpPanel
+            invitation={invitation}
+            dictionary={dictionary}
+            accessToken={accessToken}
+            preview={preview}
+          />
+        ) : null}
       </div>
     </ThemedInvitationStage>
   );
@@ -303,14 +314,8 @@ function RsvpPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-
-  if (preview || !invitation.capabilities.canRespond) {
-    return (
-      <p className="mt-8 rounded-2xl bg-violet-500/15 p-4 text-center text-violet-100">
-        {dictionary.invitation.rsvpPreviewDisabled}
-      </p>
-    );
-  }
+  const [panelOpen, setPanelOpen] = useState(false);
+  const responseEnabled = !preview && invitation.capabilities.canRespond;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -347,6 +352,7 @@ function RsvpPanel({
     setResponse(result);
     setEditing(false);
     setConfirmed(true);
+    setPanelOpen(true);
   }
 
   async function cancel() {
@@ -364,162 +370,291 @@ function RsvpPanel({
   }
 
   return (
-    <section className="mt-8 rounded-3xl border border-cyan-300/20 bg-slate-950/70 p-5 @md:p-7">
-      <h2 className="text-2xl font-black text-cyan-100">{dictionary.invitation.rsvpTitle}</h2>
-      <p className="mt-2 text-sm text-slate-300">{dictionary.invitation.rsvpDescription}</p>
-      {confirmed ? (
-        <p role="status" className="mt-4 rounded-xl bg-emerald-500/15 p-3 text-emerald-100">
-          {dictionary.invitation.rsvpSaved}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="mt-4 rounded-xl bg-red-500/15 p-3 text-red-100">
-          {dictionary.invitation.rsvpError}
-        </p>
-      ) : null}
-      {response && !editing ? (
-        <div className="mt-5 rounded-2xl bg-white/5 p-4">
-          <p className="font-bold text-violet-100">
-            {dictionary.invitation.rsvpCurrent}: {statusLabel(response.status, dictionary)}
-          </p>
-          {response.status === 'ACCEPTED' ? (
-            <p className="mt-2 text-sm text-slate-200">
-              {dictionary.invitation.rsvpConfirmedPeople.replace(
-                '{count}',
-                String(response.totalAttending ?? 0),
-              )}
-            </p>
-          ) : null}
-          {response.dietaryNotes ? (
-            <p className="mt-2 text-sm text-slate-200">
-              <strong>{dictionary.invitation.rsvpDietaryNotesSummary}:</strong>{' '}
-              {response.dietaryNotes}
-            </p>
-          ) : null}
-          {response.guestMessage ? (
-            <p className="mt-2 text-sm text-slate-200">
-              <strong>{dictionary.invitation.rsvpGuestMessageSummary}:</strong>{' '}
-              {response.guestMessage}
-            </p>
-          ) : null}
-          <div className="mt-4 flex flex-wrap gap-3">
+    <>
+      {panelOpen ? (
+        <section
+          role="dialog"
+          aria-labelledby="rsvp-panel-title"
+          className={`${preview ? 'absolute' : 'fixed'} invitation-rsvp-panel inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-h-[min(68dvh,42rem)] max-w-2xl overflow-y-auto rounded-3xl border border-cyan-300/20 bg-slate-950/96 p-5 shadow-2xl backdrop-blur-xl @md:p-7`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="rsvp-panel-title" className="text-xl font-black text-cyan-100">
+                {dictionary.invitation.rsvpTitle}
+              </h2>
+              <p className="mt-1 text-sm text-slate-300">{dictionary.invitation.rsvpDescription}</p>
+            </div>
             <button
               type="button"
-              onClick={() => {
-                setEditing(true);
-                setConfirmed(false);
-              }}
-              className="min-h-11 rounded-xl bg-cyan-600 px-4 py-2 font-bold"
+              title={dictionary.invitation.closeRsvp}
+              aria-label={dictionary.invitation.closeRsvp}
+              onClick={() => setPanelOpen(false)}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/15"
             >
-              {dictionary.invitation.rsvpUpdate}
+              <X aria-hidden size={18} />
             </button>
-            {response.status === 'ACCEPTED' ? (
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void cancel()}
-                className="min-h-11 rounded-xl border border-red-300/40 px-4 py-2 font-bold text-red-100"
-              >
-                {dictionary.invitation.rsvpCancel}
-              </button>
-            ) : null}
           </div>
-        </div>
-      ) : (
-        <form className="mt-5 grid gap-4" onSubmit={submit}>
-          <fieldset>
-            <legend className="font-bold text-slate-100">
-              {dictionary.invitation.rsvpQuestion}
-            </legend>
-            <div className="mt-3 grid gap-2 @md:grid-cols-3">
-              {(['ACCEPTED', 'DECLINED', 'NOT_SURE'] as const).map((value) => (
-                <label
-                  key={value}
-                  className={`flex min-h-12 cursor-pointer items-center rounded-xl border px-4 py-3 ${
-                    status === value
-                      ? 'border-cyan-300 bg-cyan-500/20'
-                      : 'border-white/15 bg-white/5'
-                  }`}
-                >
-                  <input
-                    className="mr-3"
-                    type="radio"
-                    name="status"
-                    value={value}
-                    checked={status === value}
-                    onChange={() => setStatus(value)}
-                  />
-                  {statusLabel(value, dictionary)}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          {status === 'ACCEPTED' ? (
-            invitation.party.mode === 'TOTAL_ONLY' ? (
-              <RsvpNumber
-                name="totalAttending"
-                label={dictionary.invitation.rsvpTotalAttending}
-                max={invitation.party.totalInvited}
-                defaultValue={response?.totalAttending ?? invitation.party.totalInvited}
-              />
-            ) : (
-              <div className="grid gap-3 @md:grid-cols-2">
-                <RsvpNumber
-                  name="adultsAttending"
-                  label={dictionary.invitation.rsvpAdultsAttending}
-                  max={invitation.party.adultsInvited ?? 0}
-                  defaultValue={response?.adultsAttending ?? invitation.party.adultsInvited ?? 0}
-                />
-                <RsvpNumber
-                  name="childrenAttending"
-                  label={dictionary.invitation.rsvpChildrenAttending}
-                  max={invitation.party.childrenInvited ?? 0}
-                  defaultValue={
-                    response?.childrenAttending ?? invitation.party.childrenInvited ?? 0
-                  }
-                />
-              </div>
-            )
+          {confirmed ? (
+            <p role="status" className="mt-4 rounded-xl bg-emerald-500/15 p-3 text-emerald-100">
+              {dictionary.invitation.rsvpSaved}
+            </p>
           ) : null}
-          <label className="text-sm font-semibold text-slate-200">
-            {dictionary.invitation.rsvpDietaryNotes}
-            <textarea
-              name="dietaryNotes"
-              maxLength={500}
-              defaultValue={response?.dietaryNotes ?? ''}
-              className="mt-1 min-h-20 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
-            />
-          </label>
-          <label className="text-sm font-semibold text-slate-200">
-            {dictionary.invitation.rsvpGuestMessage}
-            <textarea
-              name="guestMessage"
-              maxLength={1000}
-              defaultValue={response?.guestMessage ?? ''}
-              className="mt-1 min-h-24 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
-            />
-          </label>
-          <div className="flex flex-wrap gap-3">
+          {error ? (
+            <p role="alert" className="mt-4 rounded-xl bg-red-500/15 p-3 text-red-100">
+              {dictionary.invitation.rsvpError}
+            </p>
+          ) : null}
+          {response && !editing ? (
+            <div className="mt-5 rounded-2xl bg-white/5 p-4">
+              <p className="font-bold text-violet-100">
+                {dictionary.invitation.rsvpCurrent}: {statusLabel(response.status, dictionary)}
+              </p>
+              {response.status === 'ACCEPTED' ? (
+                <p className="mt-2 text-sm text-slate-200">
+                  {dictionary.invitation.rsvpConfirmedPeople.replace(
+                    '{count}',
+                    String(response.totalAttending ?? 0),
+                  )}
+                </p>
+              ) : null}
+              {response.dietaryNotes ? (
+                <p className="mt-2 text-sm text-slate-200">
+                  <strong>{dictionary.invitation.rsvpDietaryNotesSummary}:</strong>{' '}
+                  {response.dietaryNotes}
+                </p>
+              ) : null}
+              {response.guestMessage ? (
+                <p className="mt-2 text-sm text-slate-200">
+                  <strong>{dictionary.invitation.rsvpGuestMessageSummary}:</strong>{' '}
+                  {response.guestMessage}
+                </p>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(true);
+                    setConfirmed(false);
+                  }}
+                  className="min-h-11 rounded-xl bg-cyan-600 px-4 py-2 font-bold"
+                >
+                  {dictionary.invitation.rsvpUpdate}
+                </button>
+                {response.status === 'ACCEPTED' ? (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void cancel()}
+                    className="min-h-11 rounded-xl border border-red-300/40 px-4 py-2 font-bold text-red-100"
+                  >
+                    {dictionary.invitation.rsvpCancel}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : responseEnabled ? (
+            <form className="mt-5 grid gap-4" onSubmit={submit}>
+              <fieldset>
+                <legend className="font-bold text-slate-100">
+                  {dictionary.invitation.rsvpQuestion}
+                </legend>
+                <div className="mt-3 grid gap-2 @md:grid-cols-3">
+                  {(['ACCEPTED', 'DECLINED', 'NOT_SURE'] as const).map((value) => (
+                    <label
+                      key={value}
+                      className={`flex min-h-12 cursor-pointer items-center rounded-xl border px-4 py-3 ${
+                        status === value
+                          ? 'border-cyan-300 bg-cyan-500/20'
+                          : 'border-white/15 bg-white/5'
+                      }`}
+                    >
+                      <input
+                        className="mr-3"
+                        type="radio"
+                        name="status"
+                        value={value}
+                        checked={status === value}
+                        onChange={() => setStatus(value)}
+                      />
+                      {statusLabel(value, dictionary)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {status === 'ACCEPTED' ? (
+                invitation.party.mode === 'TOTAL_ONLY' ? (
+                  <RsvpNumber
+                    name="totalAttending"
+                    label={dictionary.invitation.rsvpTotalAttending}
+                    max={invitation.party.totalInvited}
+                    defaultValue={response?.totalAttending ?? invitation.party.totalInvited}
+                  />
+                ) : (
+                  <div className="grid gap-3 @md:grid-cols-2">
+                    <RsvpNumber
+                      name="adultsAttending"
+                      label={dictionary.invitation.rsvpAdultsAttending}
+                      max={invitation.party.adultsInvited ?? 0}
+                      defaultValue={
+                        response?.adultsAttending ?? invitation.party.adultsInvited ?? 0
+                      }
+                    />
+                    <RsvpNumber
+                      name="childrenAttending"
+                      label={dictionary.invitation.rsvpChildrenAttending}
+                      max={invitation.party.childrenInvited ?? 0}
+                      defaultValue={
+                        response?.childrenAttending ?? invitation.party.childrenInvited ?? 0
+                      }
+                    />
+                  </div>
+                )
+              ) : null}
+              <label className="text-sm font-semibold text-slate-200">
+                {dictionary.invitation.rsvpDietaryNotes}
+                <textarea
+                  name="dietaryNotes"
+                  maxLength={500}
+                  defaultValue={response?.dietaryNotes ?? ''}
+                  className="mt-1 min-h-20 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
+                />
+              </label>
+              <label className="text-sm font-semibold text-slate-200">
+                {dictionary.invitation.rsvpGuestMessage}
+                <textarea
+                  name="guestMessage"
+                  maxLength={1000}
+                  defaultValue={response?.guestMessage ?? ''}
+                  className="mt-1 min-h-24 w-full rounded-xl border border-white/15 bg-slate-900 p-3"
+                />
+              </label>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="min-h-12 rounded-xl bg-violet-500 px-5 py-3 font-black disabled:opacity-60"
+                >
+                  {saving ? dictionary.invitation.rsvpSaving : dictionary.invitation.rsvpSubmit}
+                </button>
+                {response ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="min-h-12 rounded-xl border border-white/20 px-5 py-3 font-bold"
+                  >
+                    {dictionary.invitation.rsvpKeepCurrent}
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          ) : (
+            <p className="mt-4 rounded-2xl bg-violet-500/15 p-4 text-center text-violet-100">
+              {dictionary.invitation.rsvpPreviewDisabled}
+            </p>
+          )}
+        </section>
+      ) : null}
+      <footer
+        aria-label={dictionary.invitation.rsvpTitle}
+        className={`${preview ? 'absolute' : 'fixed'} invitation-rsvp-footer inset-x-0 bottom-0 z-40 border-t border-white/15 bg-slate-950/92 px-3 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] shadow-[0_-1rem_3rem_rgb(2_6_23_/_35%)] backdrop-blur-xl`}
+      >
+        <div className="mx-auto flex max-w-2xl items-center gap-2">
+          <p className="mr-auto hidden min-w-0 text-sm font-bold text-cyan-100 @sm:block">
+            {response
+              ? `${dictionary.invitation.rsvpCurrent}: ${statusLabel(response.status, dictionary)}`
+              : dictionary.invitation.rsvpQuestion}
+          </p>
+          <RsvpQuickAction
+            label={dictionary.invitation.rsvpYesShort}
+            title={dictionary.invitation.rsvpAccepted}
+            selected={response?.status === 'ACCEPTED'}
+            disabled={!responseEnabled}
+            icon={<Check aria-hidden size={18} />}
+            onClick={() => {
+              setStatus('ACCEPTED');
+              setEditing(true);
+              setConfirmed(false);
+              setPanelOpen(true);
+            }}
+          />
+          <RsvpQuickAction
+            label={dictionary.invitation.rsvpNoShort}
+            title={dictionary.invitation.rsvpDeclined}
+            selected={response?.status === 'DECLINED'}
+            disabled={!responseEnabled}
+            icon={<X aria-hidden size={18} />}
+            onClick={() => {
+              setStatus('DECLINED');
+              setEditing(true);
+              setConfirmed(false);
+              setPanelOpen(true);
+            }}
+          />
+          <RsvpQuickAction
+            label={dictionary.invitation.rsvpMaybeShort}
+            title={dictionary.invitation.rsvpNotSure}
+            selected={response?.status === 'NOT_SURE'}
+            disabled={!responseEnabled}
+            icon={<HelpCircle aria-hidden size={18} />}
+            onClick={() => {
+              setStatus('NOT_SURE');
+              setEditing(true);
+              setConfirmed(false);
+              setPanelOpen(true);
+            }}
+          />
+          {response ? (
             <button
-              type="submit"
-              disabled={saving}
-              className="min-h-12 rounded-xl bg-violet-500 px-5 py-3 font-black disabled:opacity-60"
+              type="button"
+              disabled={!responseEnabled}
+              title={dictionary.invitation.rsvpUpdate}
+              aria-label={dictionary.invitation.rsvpUpdate}
+              onClick={() => {
+                setEditing(false);
+                setPanelOpen(true);
+              }}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/15 disabled:opacity-45"
             >
-              {saving ? dictionary.invitation.rsvpSaving : dictionary.invitation.rsvpSubmit}
+              <Pencil aria-hidden size={17} />
             </button>
-            {response ? (
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="min-h-12 rounded-xl border border-white/20 px-5 py-3 font-bold"
-              >
-                {dictionary.invitation.rsvpKeepCurrent}
-              </button>
-            ) : null}
-          </div>
-        </form>
-      )}
-    </section>
+          ) : null}
+        </div>
+        {preview ? (
+          <span className="sr-only">{dictionary.invitation.rsvpPreviewDisabled}</span>
+        ) : null}
+      </footer>
+    </>
+  );
+}
+
+function RsvpQuickAction({
+  label,
+  title,
+  selected,
+  disabled,
+  icon,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  selected: boolean;
+  disabled: boolean;
+  icon: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={selected}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-full px-2 text-xs font-black @sm:flex-none @sm:px-4 ${selected ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-white'} disabled:cursor-not-allowed disabled:opacity-45`}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </button>
   );
 }
 
@@ -539,7 +674,7 @@ function MapActions({
   }
   return (
     <section aria-label={dictionary.invitation.address}>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
         {maps.configuredMapsUrl ? (
           <ExternalAction
             href={maps.configuredMapsUrl}
@@ -564,10 +699,11 @@ function MapActions({
         ) : null}
         {maps.googleMapsUrl || maps.appleMapsUrl ? (
           <details className="relative">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold">
-              {dictionary.invitation.mapProviders} <ChevronDown aria-hidden size={16} />
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-white/20 px-3 py-2 text-sm font-bold">
+              <span className="sr-only">{dictionary.invitation.mapProviders}</span>
+              <ChevronDown aria-hidden size={18} />
             </summary>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="absolute top-full right-0 z-30 mt-2 grid w-[min(17rem,calc(100vw-2rem))] gap-2 rounded-2xl border border-white/15 bg-slate-950 p-3 text-left shadow-2xl">
               {maps.googleMapsUrl ? (
                 <ExternalAction
                   href={maps.googleMapsUrl}
@@ -577,10 +713,20 @@ function MapActions({
               {maps.appleMapsUrl ? (
                 <ExternalAction href={maps.appleMapsUrl} label={dictionary.invitation.appleMaps} />
               ) : null}
+              {maps.formattedAddress ? (
+                <button
+                  type="button"
+                  onClick={() => void copyAddress()}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-bold"
+                >
+                  <Copy aria-hidden size={18} />
+                  {copied ? dictionary.invitation.addressCopied : dictionary.invitation.copyAddress}
+                </button>
+              ) : null}
             </div>
           </details>
         ) : null}
-        {maps.formattedAddress ? (
+        {!maps.googleMapsUrl && !maps.appleMapsUrl && maps.formattedAddress ? (
           <button
             type="button"
             title={dictionary.invitation.copyAddress}
@@ -632,41 +778,51 @@ function CalendarActions({
     window.URL.revokeObjectURL(url);
   }
   return (
-    <section>
-      <div className="flex flex-wrap gap-3">
+    <details className="relative shrink-0">
+      <summary
+        title={dictionary.invitation.calendarTitle}
+        aria-label={dictionary.invitation.calendarTitle}
+        className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/10"
+      >
+        <CalendarPlus aria-hidden size={19} />
+      </summary>
+      <div className="absolute top-full right-0 z-30 mt-2 grid w-[min(18rem,calc(100vw-2rem))] gap-2 rounded-2xl border border-white/15 bg-slate-950 p-3 shadow-2xl">
         <ExternalAction
           href={calendar.googleCalendarUrl}
           label={dictionary.invitation.googleCalendar}
-          icon="calendar"
         />
         <ExternalAction
           href={calendar.outlookCalendarUrl}
           label={dictionary.invitation.outlookCalendar}
-          icon="calendar"
         />
         <button
           type="button"
           disabled={preview}
           onClick={() => void download()}
-          className="min-h-11 rounded-xl bg-violet-500 px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
         >
+          <CalendarPlus aria-hidden size={18} />
           {dictionary.invitation.appleCalendar}
         </button>
         <button
           type="button"
           disabled={preview}
           onClick={() => void download()}
-          className="min-h-11 rounded-xl border border-white/20 px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
         >
+          <Download aria-hidden size={18} />
           {dictionary.invitation.downloadCalendar}
         </button>
       </div>
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-red-200">
+        <p
+          role="alert"
+          className="absolute top-full right-0 z-40 mt-2 w-64 rounded-xl bg-red-950 p-3 text-sm text-red-200"
+        >
           {dictionary.invitation.calendarDownloadError}
         </p>
       ) : null}
-    </section>
+    </details>
   );
 }
 
@@ -686,7 +842,7 @@ function ExternalAction({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${primary ? 'bg-amber-300 text-slate-950' : 'bg-cyan-700 text-white'}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${primary ? 'bg-amber-300 text-slate-950 shadow-lg hover:bg-amber-200' : 'bg-cyan-700 text-white hover:bg-cyan-600'}`}
     >
       {icon === 'map' ? <MapPin aria-hidden size={18} /> : null}
       {icon === 'calendar' ? <CalendarPlus aria-hidden size={18} /> : null}
@@ -749,11 +905,20 @@ function statusLabel(status: RsvpStatus, dictionary: Dictionary) {
   }[status];
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({
+  label,
+  value,
+  supporting,
+}: {
+  label: string;
+  value: string;
+  supporting?: string;
+}) {
   return (
     <div>
-      <dt className="text-xs font-bold text-cyan-200">{label}</dt>
-      <dd className="mt-1 text-base text-slate-50">{value}</dd>
+      <p className="text-xs font-bold text-cyan-200">{label}</p>
+      <p className="mt-1 text-base text-slate-50">{value}</p>
+      {supporting ? <p className="mt-1 text-sm text-slate-300">{supporting}</p> : null}
     </div>
   );
 }

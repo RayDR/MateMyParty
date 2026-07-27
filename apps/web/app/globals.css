@@ -14,20 +14,87 @@ body {
   animation: invitation-reveal 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.invitation-reveal-envelope_reveal {
-  animation-name: invitation-envelope;
+.invitation-closed-card {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    0 2.5rem 7rem rgb(2 6 23 / 55%),
+    inset 0 0 0 1px rgb(255 255 255 / 5%);
 }
 
-.invitation-reveal-adventure_gates {
+.invitation-closed-card::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(255 255 255 / 9%), transparent 34%);
+}
+
+.invitation-back {
+  animation-name: invitation-card-rise;
+}
+
+.invitation-opening-envelope_reveal::before {
+  position: absolute;
+  z-index: 30;
+  inset: 0 0 46%;
+  pointer-events: none;
+  content: '';
+  transform-origin: top;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: linear-gradient(160deg, #312e81, #701a75);
+  animation: invitation-flap-lift 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-opening-night_dragon_flight {
+  animation-name: invitation-night-cinematic;
+  animation-duration: 850ms;
+}
+
+.invitation-opening-adventure_gates {
   animation-name: invitation-gates;
 }
 
-.invitation-reveal-night_dragon_flight {
-  animation-name: invitation-cinematic;
+.invitation-opening-winter_snow {
+  animation-name: invitation-card-flip;
 }
 
-.invitation-reveal-winter_snow {
-  animation-name: invitation-card-flip;
+.invitation-countdown-watermark {
+  position: absolute;
+  z-index: 0;
+  top: 0.25rem;
+  right: 0.65rem;
+  left: 0.65rem;
+  pointer-events: none;
+  overflow: hidden;
+  color: rgb(165 243 252 / 9%);
+  font-size: clamp(2rem, 8vw, 5.5rem);
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -0.06em;
+  user-select: none;
+}
+
+.invitation-essential {
+  margin-top: clamp(3rem, 9vw, 5.5rem);
+}
+
+.invitation-rsvp-footer,
+.invitation-rsvp-panel {
+  overscroll-behavior: contain;
+}
+
+[data-reduced-motion='true'] .invitation-front,
+[data-reduced-motion='true'] .invitation-back {
+  animation: none;
+}
+
+[data-reduced-motion='true'] .invitation-opening-envelope_reveal::before {
+  display: none;
 }
 
 .invitation-section[open] .invitation-chevron {
@@ -36,13 +103,6 @@ body {
 
 .invitation-chevron {
   transition: transform 180ms ease;
-}
-
-.invitation-front-message {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
 }
 
 .rich-text p,
@@ -89,14 +149,42 @@ body {
   }
 }
 
-@keyframes invitation-envelope {
+@keyframes invitation-card-rise {
   from {
     opacity: 0;
-    transform: translateY(2.5rem) rotateX(20deg);
+    transform: perspective(70rem) translateY(2.5rem) rotateX(5deg) scale(0.965);
   }
   to {
     opacity: 1;
-    transform: translateY(0) rotateX(0);
+    transform: perspective(70rem) translateY(0) rotateX(0) scale(1);
+  }
+}
+
+@keyframes invitation-flap-lift {
+  0% {
+    opacity: 1;
+    transform: perspective(50rem) rotateX(0);
+  }
+  72% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(50rem) rotateX(108deg) translateY(-1.5rem);
+    visibility: hidden;
+  }
+}
+
+@keyframes invitation-night-cinematic {
+  from {
+    opacity: 0;
+    filter: brightness(0.15) saturate(0.7);
+    transform: scale(1.035) translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+    transform: scale(1) translateY(0);
   }
 }
 
@@ -108,19 +196,6 @@ body {
   to {
     opacity: 1;
     transform: scaleX(1);
-  }
-}
-
-@keyframes invitation-cinematic {
-  from {
-    opacity: 0;
-    filter: brightness(0.3);
-    transform: scale(1.04);
-  }
-  to {
-    opacity: 1;
-    filter: brightness(1);
-    transform: scale(1);
   }
 }
 
@@ -262,7 +337,12 @@ body {
   }
 
   .invitation-front,
-  .invitation-back {
+  .invitation-back,
+  .invitation-opening-envelope_reveal::before {
     animation: none;
+  }
+
+  .invitation-opening-envelope_reveal::before {
+    display: none;
   }
 }
