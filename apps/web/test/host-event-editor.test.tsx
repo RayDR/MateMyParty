@@ -23,4 +23,27 @@ describe('host event editor', () => {
     expect(screen.getAllByText('You have unsaved changes.').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
   });
+
+  it('retains independent English and Spanish invitation content', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') return Response.json(hostEventDetail);
+      return Response.json(hostEventDetail);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<HostEventEditor identifier="raymundo-6" />);
+    await screen.findByLabelText('Event title');
+    await user.click(screen.getByRole('button', { name: /^ES/ }));
+    const spanishTitle = screen.getByLabelText('Event title');
+    await user.clear(spanishTitle);
+    await user.type(spanishTitle, 'Fiesta de Raymundo');
+    await user.click(screen.getByRole('button', { name: /^EN/ }));
+    expect(screen.getByLabelText('Event title')).toHaveValue('Raymundo’s 6th Birthday');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH');
+    expect(JSON.parse(String(request?.[1]?.body)).localizedContent).toMatchObject({
+      'en-US': { title: 'Raymundo’s 6th Birthday' },
+      'es-MX': { title: 'Fiesta de Raymundo' },
+    });
+  });
 });

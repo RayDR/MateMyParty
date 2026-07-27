@@ -8,6 +8,133 @@ body {
   min-height: 100vh;
 }
 
+.invitation-front,
+.invitation-back {
+  transform-origin: center;
+  animation: invitation-reveal 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-reveal-envelope_reveal {
+  animation-name: invitation-envelope;
+}
+
+.invitation-reveal-adventure_gates {
+  animation-name: invitation-gates;
+}
+
+.invitation-reveal-night_dragon_flight {
+  animation-name: invitation-cinematic;
+}
+
+.invitation-reveal-winter_snow {
+  animation-name: invitation-card-flip;
+}
+
+.invitation-section[open] .invitation-chevron {
+  transform: rotate(180deg);
+}
+
+.invitation-chevron {
+  transition: transform 180ms ease;
+}
+
+.invitation-front-message {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.rich-text p,
+.rich-text ul,
+.rich-text ol {
+  margin-block: 0.65rem;
+  line-height: 1.7;
+}
+
+.rich-text ul,
+.rich-text ol {
+  padding-left: 1.35rem;
+}
+
+.rich-text ul {
+  list-style: disc;
+}
+
+.rich-text ol {
+  list-style: decimal;
+}
+
+.rich-text h2,
+.rich-text h3 {
+  margin-top: 1rem;
+  font-weight: 800;
+  color: #cffafe;
+}
+
+.rich-text a {
+  color: #67e8f9;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+@keyframes invitation-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invitation-envelope {
+  from {
+    opacity: 0;
+    transform: translateY(2.5rem) rotateX(20deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
+  }
+}
+
+@keyframes invitation-gates {
+  from {
+    opacity: 0;
+    transform: scaleX(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes invitation-cinematic {
+  from {
+    opacity: 0;
+    filter: brightness(0.3);
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes invitation-card-flip {
+  from {
+    opacity: 0;
+    transform: perspective(60rem) rotateY(-18deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(60rem) rotateY(0);
+  }
+}
+
 .celebration-flight::before,
 .celebration-flight::after {
   position: absolute;
@@ -132,5 +259,10 @@ body {
   .celebration-snow,
   .invitation-motion-video {
     display: none;
+  }
+
+  .invitation-front,
+  .invitation-back {
+    animation: none;
   }
 }

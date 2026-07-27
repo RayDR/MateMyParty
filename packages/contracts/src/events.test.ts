@@ -168,6 +168,18 @@ describe('event contracts', () => {
     expect(
       updateHostEventInputSchema.safeParse({
         ...validUpdate,
+        thumbnailImageRef: '/private-media/raymundo-6/theme.mp3',
+      }).success,
+    ).toBe(false);
+    expect(
+      updateHostEventInputSchema.safeParse({
+        ...validUpdate,
+        publicThumbnailRef: 'https://images.example.test/tracker',
+      }).success,
+    ).toBe(false);
+    expect(
+      updateHostEventInputSchema.safeParse({
+        ...validUpdate,
         mapsUrl: 'https://user:password@maps.example.test/place',
       }).success,
     ).toBe(false);

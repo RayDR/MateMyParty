@@ -16,6 +16,8 @@ import type {
   RsvpStatus,
 } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
+import { usePersistentLocale } from '../lib/use-persistent-locale';
+import { Plus, X } from 'lucide-react';
 
 type Filter =
   | 'all'
@@ -70,7 +72,7 @@ const emptyEmailStatistics: EventEmailStatistics = {
 };
 
 export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string }) {
-  const [locale, setLocale] = useState<Locale>('en-US');
+  const [locale, setLocale] = usePersistentLocale('en-US');
   const [eventDetail, setEventDetail] = useState<HostEventDetail | null>(null);
   const [guests, setGuests] = useState<HostGuest[]>([]);
   const [statistics, setStatistics] = useState(emptyStatistics);
@@ -199,7 +201,6 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     setEditing(guest);
     setCountMode(guest.invitationCountMode);
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -420,8 +421,9 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                 <button
                   type="button"
                   onClick={showForm ? () => setShowForm(false) : beginCreate}
-                  className="rounded-xl bg-violet-500 px-4 py-2.5 font-bold shadow-lg shadow-violet-900/30"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 font-bold"
                 >
+                  {!showForm ? <Plus aria-hidden size={18} /> : null}
                   {showForm ? dictionary.host.hideGuestForm : dictionary.host.showGuestForm}
                 </button>
                 <label className="ml-auto text-sm text-slate-300">
@@ -449,30 +451,36 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           </div>
         ) : null}
 
-        {showForm ? (
-          <GuestForm
-            key={editing?.id ?? 'new'}
-            dictionary={dictionary}
-            locale={locale}
-            editing={editing}
-            countMode={countMode}
-            setCountMode={setCountMode}
-            submit={submit}
-            cancel={() => {
-              setEditing(null);
-              setShowForm(false);
-            }}
-          />
-        ) : null}
-
-        <StatisticsGrid statistics={statistics} dictionary={dictionary} />
-        <RsvpStatisticsGrid statistics={rsvpStatistics} dictionary={dictionary} />
-        <EmailDeliveryPanel
-          statistics={emailStatistics}
-          eventIdentifier={eventIdentifier}
-          locale={locale}
-          dictionary={dictionary}
-        />
+        <section
+          aria-label={dictionary.host.guestSummary}
+          className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-white/10 bg-slate-900/75 px-4 py-3 text-sm"
+        >
+          <strong>
+            {statistics.totalGuests} {dictionary.host.totalGuestsStat.toLocaleLowerCase()}
+          </strong>
+          <span>
+            {statistics.totalPeopleInvited} {dictionary.host.totalPeopleStat.toLocaleLowerCase()}
+          </span>
+          <span>
+            {rsvpStatistics.confirmedTotal}{' '}
+            {dictionary.host.rsvpConfirmedTotalStat.toLocaleLowerCase()}
+          </span>
+          <details className="basis-full border-t border-white/10 pt-3">
+            <summary className="cursor-pointer font-bold text-cyan-200">
+              {dictionary.host.showDetailedStatistics}
+            </summary>
+            <div className="mt-4">
+              <StatisticsGrid statistics={statistics} dictionary={dictionary} />
+              <RsvpStatisticsGrid statistics={rsvpStatistics} dictionary={dictionary} />
+              <EmailDeliveryPanel
+                statistics={emailStatistics}
+                eventIdentifier={eventIdentifier}
+                locale={locale}
+                dictionary={dictionary}
+              />
+            </div>
+          </details>
+        </section>
 
         <section className="mb-5 rounded-2xl border border-white/10 bg-slate-900/75 p-4">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -596,6 +604,41 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           onCopy={() => void copy(previewGuest.id)}
           onClose={() => setPreviewGuest(null)}
         />
+      ) : null}
+      {showForm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={editing ? dictionary.host.save : dictionary.host.showGuestForm}
+            className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/15 bg-slate-900 p-2 shadow-2xl"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setShowForm(false);
+              }}
+              aria-label={dictionary.host.closeDialog}
+              className="absolute right-4 top-4 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-slate-950/85"
+            >
+              <X aria-hidden size={20} />
+            </button>
+            <GuestForm
+              key={editing?.id ?? 'new'}
+              dictionary={dictionary}
+              locale={locale}
+              editing={editing}
+              countMode={countMode}
+              setCountMode={setCountMode}
+              submit={submit}
+              cancel={() => {
+                setEditing(null);
+                setShowForm(false);
+              }}
+            />
+          </section>
+        </div>
       ) : null}
       {rsvpDetail ? (
         <RsvpDetailModal

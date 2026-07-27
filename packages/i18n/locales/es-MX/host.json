@@ -258,5 +258,21 @@
   "mobilePreview": "Ancho móvil",
   "desktopPreview": "Ancho de escritorio",
   "previewUsesPlaceholder": "Solo previsualización: el botón usa un enlace inactivo y no crea ni invalida una invitación.",
-  "smsUnavailable": "El envío por SMS no está disponible. No se ha enviado ningún SMS."
+  "smsUnavailable": "El envío por SMS no está disponible. No se ha enviado ningún SMS.",
+  "richTextBold": "Negrita",
+  "richTextItalic": "Cursiva",
+  "richTextBulletList": "Lista con viñetas",
+  "richTextNumberedList": "Lista numerada",
+  "richTextHeading": "Encabezado de sección",
+  "richTextLink": "Enlace seguro",
+  "richTextLinkPrompt": "Ingresa un enlace HTTPS o de correo",
+  "richTextLinkText": "texto del enlace",
+  "richTextPlaceholder": "texto con formato",
+  "richTextPreview": "Vista previa de la invitación",
+  "languageComplete": "Completo",
+  "languageIncomplete": "Falta contenido",
+  "guestSummary": "Resumen de invitados",
+  "showDetailedStatistics": "Mostrar estadísticas detalladas",
+  "hideDetailedStatistics": "Ocultar estadísticas detalladas",
+  "closeDialog": "Cerrar"
 }

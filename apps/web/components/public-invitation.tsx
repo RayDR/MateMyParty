@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   CalendarEvent,
   PrivateInvitation as PrivateInvitationData,
   PublicRsvpResponse,
   RsvpStatus,
 } from '@matemyparty/contracts';
+import { richTextToHtml } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
+import { CalendarPlus, ChevronDown, Copy, MapPin, RotateCcw, Sparkles } from 'lucide-react';
 import { LanguageSelector } from './language-selector';
 import { ThemedInvitationStage } from './themed-invitation-stage';
 import { EventCountdown } from './event-countdown';
@@ -28,6 +30,7 @@ export function PublicInvitation({
   accessToken?: string;
 }) {
   const [locale, setLocale] = useState(initialLocale);
+  const [opened, setOpened] = useState(false);
   const [calendar, setCalendar] = useState<CalendarEvent>(invitation.tools.calendar);
   const dictionary = getDictionary(locale);
   const { event } = invitation;
@@ -82,8 +85,13 @@ export function PublicInvitation({
       mediaDisabled={mediaDisabled}
       forceReducedMotion={reducedMotion}
       containedControls={preview}
+      mediaUnlocked={opened}
     >
-      <div lang={locale} className="mx-auto min-h-screen max-w-5xl px-4 pb-32 pt-5 @md:px-8">
+      <div
+        lang={locale}
+        data-invitation-side={opened ? 'back' : 'front'}
+        className="mx-auto min-h-screen max-w-5xl px-4 pb-32 pt-5 @md:px-8"
+      >
         <header className="flex flex-wrap items-center justify-between gap-3">
           {preview ? (
             <span className="rounded-full bg-amber-300 px-4 py-2 text-xs font-black text-slate-950">
@@ -94,92 +102,182 @@ export function PublicInvitation({
           )}
           <LanguageSelector locale={locale} dictionary={dictionary} onChange={setLocale} />
         </header>
-        <article className="mx-auto mt-8 overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/68 shadow-2xl backdrop-blur-xl">
-          {event.presentation.thumbnailRef ? (
-            <img
-              src={event.presentation.thumbnailRef}
-              alt={content.thumbnailAltText}
-              className="max-h-72 w-full object-cover"
-            />
-          ) : null}
-          <div className="p-5 @md:p-9">
-            <div className="text-center">
-              <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200">
-                {dictionary.event.birthday}
+        {!opened ? (
+          <article
+            className={`invitation-front invitation-reveal-${event.presentation.mode.toLowerCase()} mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950/72 shadow-2xl backdrop-blur-xl`}
+          >
+            {event.presentation.thumbnailRef ? (
+              <img
+                src={event.presentation.thumbnailRef}
+                alt={content.thumbnailAltText}
+                className="aspect-[4/3] max-h-[26rem] w-full object-cover"
+              />
+            ) : (
+              <div className="aspect-[4/3] bg-[radial-gradient(circle_at_50%_30%,#155e75,#172554_48%,#020617)]" />
+            )}
+            <div className="p-6 text-center @md:p-10">
+              <p className="text-sm font-bold tracking-[0.18em] text-amber-200">
+                {dictionary.invitation.youAreInvited}
               </p>
-              <h1 className="mt-4 text-4xl font-black @md:text-6xl">{content.title}</h1>
-              <p className="mt-3 text-xl text-violet-100">{content.celebrantName}</p>
+              <h1 className="mt-3 text-4xl font-black text-balance @md:text-6xl">
+                {content.celebrantName}
+              </h1>
               {event.celebrantAge ? (
-                <p className="mt-1 text-slate-300">
+                <p className="mt-2 text-lg text-cyan-100">
                   {dictionary.event.age.replace('{age}', String(event.celebrantAge))}
                 </p>
               ) : null}
-              <p className="mt-6 rounded-2xl bg-cyan-400/10 p-4 text-lg text-cyan-50">
+              <p className="mt-6 text-lg text-slate-100">
                 {dictionary.invitation.preparedFor.replace(
                   '{guestName}',
                   invitation.guestDisplayName,
                 )}
               </p>
+              {content.hostMessage ? (
+                <div className="rich-text invitation-front-message mt-5 text-slate-300">
+                  <RichText value={content.hostMessage} />
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setOpened(true)}
+                className="mx-auto mt-7 inline-flex min-h-12 items-center gap-2 rounded-full bg-amber-300 px-6 py-3 font-black text-slate-950 shadow-xl transition hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+              >
+                <Sparkles aria-hidden size={19} />
+                {dictionary.invitation.openInvitation}
+              </button>
+              {event.presentation.audioRef ? (
+                <p className="mt-3 text-xs text-slate-400">
+                  {dictionary.invitation.audioAfterOpen}
+                </p>
+              ) : null}
             </div>
-            <EventCountdown
-              startsAt={event.startsAt}
-              endsAt={event.endsAt}
-              dictionary={dictionary}
-            />
-            <dl className="mt-8 grid gap-3 @md:grid-cols-2">
-              <Detail label={dictionary.event.date} value={dateTime} />
-              {endsAt ? <Detail label={dictionary.invitation.endTime} value={endsAt} /> : null}
-              <Detail label={dictionary.event.timezone} value={event.timezone} />
-              <Detail
-                label={dictionary.event.venue}
-                value={content.venueName ?? dictionary.event.datePending}
+          </article>
+        ) : (
+          <article className="invitation-back mx-auto mt-6 overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/76 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 @md:px-8">
+              <div>
+                <p className="text-xs font-bold tracking-widest text-amber-200">
+                  {dictionary.event.birthday}
+                </p>
+                <h1 className="mt-1 text-2xl font-black @md:text-3xl">{content.title}</h1>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpened(false)}
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold hover:bg-white/10"
+              >
+                <RotateCcw aria-hidden size={17} />
+                {dictionary.invitation.viewFront}
+              </button>
+            </div>
+            <div className="p-4 @md:p-8">
+              <EventCountdown
+                startsAt={event.startsAt}
+                endsAt={event.endsAt}
+                dictionary={dictionary}
               />
-              {address ? <Detail label={dictionary.invitation.address} value={address} /> : null}
-              <Detail
-                label={dictionary.invitation.invitedParty}
-                value={partyLabel(invitation, dictionary)}
-              />
-            </dl>
-            {invitation.tools.maps ? (
-              <MapActions maps={invitation.tools.maps} dictionary={dictionary} />
-            ) : null}
-            {content.arrivalInstructions ? (
-              <section className="mt-6 rounded-2xl bg-white/5 p-4">
-                <h2 className="font-bold text-cyan-200">
-                  {dictionary.invitation.arrivalInstructions}
-                </h2>
-                <p className="mt-2 text-slate-200">{content.arrivalInstructions}</p>
-              </section>
-            ) : null}
-            {content.parkingInstructions ? (
-              <section className="mt-4 rounded-2xl bg-white/5 p-4">
-                <h2 className="font-bold text-cyan-200">
-                  {dictionary.invitation.parkingInstructions}
-                </h2>
-                <p className="mt-2 text-slate-200">{content.parkingInstructions}</p>
-              </section>
-            ) : null}
-            {content.hostMessage ? (
-              <p className="mt-7 text-center text-lg text-slate-100">{content.hostMessage}</p>
-            ) : null}
-            <CalendarActions
-              calendar={calendar}
-              locale={locale}
-              dictionary={dictionary}
-              accessToken={accessToken}
-              preview={preview}
-            />
-            <RsvpPanel
-              invitation={invitation}
-              dictionary={dictionary}
-              accessToken={accessToken}
-              preview={preview}
-            />
-          </div>
-        </article>
+              <Collapsible title={dictionary.invitation.eventDetails} defaultOpen>
+                <dl className="grid gap-x-8 gap-y-5 @md:grid-cols-2">
+                  <Detail label={dictionary.event.date} value={dateTime} />
+                  {endsAt ? <Detail label={dictionary.invitation.endTime} value={endsAt} /> : null}
+                  <Detail
+                    label={dictionary.event.venue}
+                    value={content.venueName ?? dictionary.event.datePending}
+                  />
+                  {address ? (
+                    <Detail label={dictionary.invitation.address} value={address} />
+                  ) : null}
+                  <Detail
+                    label={dictionary.invitation.invitedParty}
+                    value={partyLabel(invitation, dictionary)}
+                  />
+                </dl>
+              </Collapsible>
+              {invitation.tools.maps ? (
+                <Collapsible title={dictionary.invitation.locationAndDirections}>
+                  <MapActions maps={invitation.tools.maps} dictionary={dictionary} />
+                </Collapsible>
+              ) : null}
+              {content.arrivalInstructions || content.parkingInstructions ? (
+                <Collapsible title={dictionary.invitation.arrivalInformation}>
+                  {content.arrivalInstructions ? (
+                    <RichText value={content.arrivalInstructions} />
+                  ) : null}
+                  {content.parkingInstructions ? (
+                    <div className="mt-5 border-t border-white/10 pt-5">
+                      <h3 className="font-bold text-cyan-100">
+                        {dictionary.invitation.parkingInstructions}
+                      </h3>
+                      <RichText value={content.parkingInstructions} />
+                    </div>
+                  ) : null}
+                </Collapsible>
+              ) : null}
+              <Collapsible title={dictionary.invitation.calendarTitle}>
+                <CalendarActions
+                  calendar={calendar}
+                  locale={locale}
+                  dictionary={dictionary}
+                  accessToken={accessToken}
+                  preview={preview}
+                />
+              </Collapsible>
+              {content.hostMessage ? (
+                <Collapsible title={dictionary.invitation.hostMessageTitle}>
+                  <RichText value={content.hostMessage} />
+                </Collapsible>
+              ) : null}
+              <Collapsible title={dictionary.invitation.rsvpTitle} defaultOpen>
+                <RsvpPanel
+                  invitation={invitation}
+                  dictionary={dictionary}
+                  accessToken={accessToken}
+                  preview={preview}
+                />
+              </Collapsible>
+              <button
+                type="button"
+                onClick={() => setOpened(false)}
+                className="mx-auto mt-8 flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold"
+              >
+                <RotateCcw aria-hidden size={17} /> {dictionary.invitation.viewFront}
+              </button>
+            </div>
+          </article>
+        )}
       </div>
     </ThemedInvitationStage>
   );
+}
+
+function Collapsible({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="invitation-section mt-4 rounded-2xl border border-white/10 bg-white/[0.045]"
+    >
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-black text-cyan-50 @md:px-5">
+        {title}
+        <ChevronDown aria-hidden size={19} className="invitation-chevron shrink-0" />
+      </summary>
+      <div className="rich-text border-t border-white/10 px-4 py-5 text-slate-200 @md:px-5">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function RichText({ value }: { value: string }) {
+  return <div dangerouslySetInnerHTML={{ __html: richTextToHtml(value) }} />;
 }
 
 function RsvpPanel({
@@ -434,25 +532,68 @@ function MapActions({
 }) {
   const [copied, setCopied] = useState(false);
   async function copyAddress() {
+    if (!maps.formattedAddress) return;
     await navigator.clipboard.writeText(maps.formattedAddress);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
   return (
-    <section className="mt-6" aria-label={dictionary.invitation.address}>
-      <div className="flex flex-wrap gap-3">
-        <ExternalAction href={maps.googleMapsUrl} label={dictionary.invitation.googleMaps} />
-        <ExternalAction href={maps.appleMapsUrl} label={dictionary.invitation.appleMaps} />
+    <section aria-label={dictionary.invitation.address}>
+      <div className="flex flex-wrap items-center gap-3">
         {maps.configuredMapsUrl ? (
-          <ExternalAction href={maps.configuredMapsUrl} label={dictionary.invitation.openMaps} />
+          <ExternalAction
+            href={maps.configuredMapsUrl}
+            label={dictionary.invitation.directions}
+            icon="map"
+            primary
+          />
+        ) : maps.googleMapsUrl ? (
+          <ExternalAction
+            href={maps.googleMapsUrl}
+            label={dictionary.invitation.directions}
+            icon="map"
+            primary
+          />
+        ) : maps.appleMapsUrl ? (
+          <ExternalAction
+            href={maps.appleMapsUrl}
+            label={dictionary.invitation.directions}
+            icon="map"
+            primary
+          />
         ) : null}
-        <button
-          type="button"
-          onClick={() => void copyAddress()}
-          className="min-h-11 rounded-xl border border-cyan-300/30 bg-cyan-950/60 px-4 py-2 font-bold"
-        >
-          {copied ? dictionary.invitation.addressCopied : dictionary.invitation.copyAddress}
-        </button>
+        {maps.googleMapsUrl || maps.appleMapsUrl ? (
+          <details className="relative">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold">
+              {dictionary.invitation.mapProviders} <ChevronDown aria-hidden size={16} />
+            </summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {maps.googleMapsUrl ? (
+                <ExternalAction
+                  href={maps.googleMapsUrl}
+                  label={dictionary.invitation.googleMaps}
+                />
+              ) : null}
+              {maps.appleMapsUrl ? (
+                <ExternalAction href={maps.appleMapsUrl} label={dictionary.invitation.appleMaps} />
+              ) : null}
+            </div>
+          </details>
+        ) : null}
+        {maps.formattedAddress ? (
+          <button
+            type="button"
+            title={dictionary.invitation.copyAddress}
+            aria-label={dictionary.invitation.copyAddress}
+            onClick={() => void copyAddress()}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 px-3"
+          >
+            <Copy aria-hidden size={18} />
+            <span className="sr-only">
+              {copied ? dictionary.invitation.addressCopied : dictionary.invitation.copyAddress}
+            </span>
+          </button>
+        ) : null}
       </div>
     </section>
   );
@@ -491,16 +632,17 @@ function CalendarActions({
     window.URL.revokeObjectURL(url);
   }
   return (
-    <section className="mt-8 rounded-2xl border border-violet-300/20 bg-violet-950/40 p-5">
-      <h2 className="text-lg font-black text-violet-100">{dictionary.invitation.calendarTitle}</h2>
-      <div className="mt-4 flex flex-wrap gap-3">
+    <section>
+      <div className="flex flex-wrap gap-3">
         <ExternalAction
           href={calendar.googleCalendarUrl}
           label={dictionary.invitation.googleCalendar}
+          icon="calendar"
         />
         <ExternalAction
           href={calendar.outlookCalendarUrl}
           label={dictionary.invitation.outlookCalendar}
+          icon="calendar"
         />
         <button
           type="button"
@@ -528,14 +670,26 @@ function CalendarActions({
   );
 }
 
-function ExternalAction({ href, label }: { href: string; label: string }) {
+function ExternalAction({
+  href,
+  label,
+  icon,
+  primary = false,
+}: {
+  href: string;
+  label: string;
+  icon?: 'map' | 'calendar';
+  primary?: boolean;
+}) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex min-h-11 items-center rounded-xl bg-cyan-600 px-4 py-2 font-bold"
+      className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${primary ? 'bg-amber-300 text-slate-950' : 'bg-cyan-700 text-white'}`}
     >
+      {icon === 'map' ? <MapPin aria-hidden size={18} /> : null}
+      {icon === 'calendar' ? <CalendarPlus aria-hidden size={18} /> : null}
       {label}
     </a>
   );
@@ -597,9 +751,9 @@ function statusLabel(status: RsvpStatus, dictionary: Dictionary) {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <dt className="text-xs font-bold uppercase tracking-wider text-cyan-200">{label}</dt>
-      <dd className="mt-2 text-base text-slate-50">{value}</dd>
+    <div>
+      <dt className="text-xs font-bold text-cyan-200">{label}</dt>
+      <dd className="mt-1 text-base text-slate-50">{value}</dd>
     </div>
   );
 }

@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { supportedEventLocaleSchema } from './events.js';
 
 export const mapLinksSchema = z.object({
-  formattedAddress: z.string().min(1).max(1000),
-  googleMapsUrl: z.url().startsWith('https://'),
-  appleMapsUrl: z.url().startsWith('https://'),
+  formattedAddress: z.string().min(1).max(1000).nullable(),
+  googleMapsUrl: z.url().startsWith('https://').nullable(),
+  appleMapsUrl: z.url().startsWith('https://').nullable(),
   configuredMapsUrl: z
     .url()
     .max(2048)

@@ -2,6 +2,7 @@ import {
   calendarEventSchema,
   hostCalendarPreviewSchema,
   mapLinksSchema,
+  richTextToPlainText,
   type CalendarEvent,
   type HostCalendarPreview,
   type MapLinks,
@@ -17,21 +18,23 @@ export const CALENDAR_PROVIDER_FALLBACK_MINUTES = 120;
 export function buildMapLinks(event: EventRow): MapLinks | null {
   const hasCoordinates = event.latitude !== null && event.longitude !== null;
   const hasCompleteAddress = Boolean(event.addressLine1 && event.city && event.countryCode);
-  if (!hasCoordinates && !hasCompleteAddress) return null;
+  if (!event.mapsUrl && !hasCoordinates && !hasCompleteAddress) return null;
 
   const address = formatAddress(event);
-  const query = hasCoordinates ? `${event.latitude},${event.longitude}` : address;
-  const google = new URL('https://www.google.com/maps/search/');
-  google.searchParams.set('api', '1');
-  google.searchParams.set('query', query);
-  const apple = new URL('https://maps.apple.com/');
-  apple.searchParams.set('q', address || query);
-  if (hasCoordinates) apple.searchParams.set('ll', query);
+  const locationLabel = [event.venueName, address].filter(Boolean).join(', ');
+  const query = hasCoordinates ? `${event.latitude},${event.longitude}` : locationLabel;
+  const google =
+    hasCoordinates || hasCompleteAddress ? new URL('https://www.google.com/maps/search/') : null;
+  google?.searchParams.set('api', '1');
+  google?.searchParams.set('query', query);
+  const apple = hasCoordinates || hasCompleteAddress ? new URL('https://maps.apple.com/') : null;
+  apple?.searchParams.set('q', locationLabel || query);
+  if (hasCoordinates) apple?.searchParams.set('ll', query);
 
   return mapLinksSchema.parse({
-    formattedAddress: address || query,
-    googleMapsUrl: google.toString(),
-    appleMapsUrl: apple.toString(),
+    formattedAddress: address || null,
+    googleMapsUrl: google?.toString() ?? null,
+    appleMapsUrl: apple?.toString() ?? null,
     configuredMapsUrl: event.mapsUrl,
     usesCoordinates: hasCoordinates,
   });
@@ -51,7 +54,10 @@ export function buildCalendarEvent(
   const location = [localization?.venueName ?? event.venueName, formatAddress(event)]
     .filter(Boolean)
     .join(', ');
-  const description = [hostMessage, arrivalInstructions, invitationUrl]
+  const description = [hostMessage, arrivalInstructions]
+    .filter(Boolean)
+    .map((value) => richTextToPlainText(value!))
+    .concat(invitationUrl)
     .filter(Boolean)
     .join('\n\n')
     .slice(0, 4000);
@@ -82,8 +88,8 @@ export function buildCalendarEvent(
     endsAt: event.endsAt?.toISOString() ?? null,
     timezone: event.timezone,
     location: location || null,
-    description: hostMessage?.slice(0, 4000) ?? null,
-    arrivalInstructions,
+    description: hostMessage ? richTextToPlainText(hostMessage).slice(0, 4000) : null,
+    arrivalInstructions: arrivalInstructions ? richTextToPlainText(arrivalInstructions) : null,
     invitationUrl,
     googleCalendarUrl: google.toString(),
     outlookCalendarUrl: outlook.toString(),
@@ -119,9 +125,10 @@ export function createIcs(
   const description = [
     localization?.hostMessage ?? event.hostMessage,
     localization?.arrivalInstructions,
-    invitationUrl,
   ]
     .filter(Boolean)
+    .map((value) => richTextToPlainText(value!))
+    .concat(invitationUrl)
     .join('\n\n')
     .slice(0, 4000);
   const lines = [

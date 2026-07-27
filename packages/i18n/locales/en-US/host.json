@@ -258,5 +258,21 @@
   "mobilePreview": "Mobile width",
   "desktopPreview": "Desktop width",
   "previewUsesPlaceholder": "Preview only: the button uses a non-functional placeholder and does not create or invalidate an invitation.",
-  "smsUnavailable": "SMS delivery is unavailable. No SMS has been sent."
+  "smsUnavailable": "SMS delivery is unavailable. No SMS has been sent.",
+  "richTextBold": "Bold",
+  "richTextItalic": "Italic",
+  "richTextBulletList": "Bullet list",
+  "richTextNumberedList": "Numbered list",
+  "richTextHeading": "Section heading",
+  "richTextLink": "Safe link",
+  "richTextLinkPrompt": "Enter an HTTPS or email link",
+  "richTextLinkText": "link text",
+  "richTextPlaceholder": "formatted text",
+  "richTextPreview": "Invitation preview",
+  "languageComplete": "Complete",
+  "languageIncomplete": "Needs content",
+  "guestSummary": "Guest summary",
+  "showDetailedStatistics": "Show detailed statistics",
+  "hideDetailedStatistics": "Hide detailed statistics",
+  "closeDialog": "Close"
 }

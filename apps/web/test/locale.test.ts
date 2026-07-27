@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveLocalePreference } from '../lib/locale';
+import { languageCookieOptions } from '../lib/invitation-access';
 
 describe('locale preference', () => {
   it('uses manual cookie before invitation and browser language', () => {
@@ -20,5 +21,14 @@ describe('locale preference', () => {
     expect(resolveLocalePreference({ acceptLanguage: 'es-ES,es;q=0.8' })).toBe('es-MX');
     expect(resolveLocalePreference({ eventDefaultLocale: 'es-MX' })).toBe('es-MX');
     expect(resolveLocalePreference({})).toBe('en-US');
+  });
+
+  it('keeps a safe year-long application-wide manual preference', () => {
+    expect(languageCookieOptions).toMatchObject({
+      httpOnly: false,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 365 * 24 * 60 * 60,
+    });
   });
 });

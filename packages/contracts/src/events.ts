@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { richTextSchema } from './rich-text.js';
 
 export const supportedEventLocaleSchema = z.enum(['en-US', 'es-MX']);
 export const eventStatusSchema = z.enum([
@@ -19,6 +20,7 @@ export const eventAnimationModeSchema = z.enum(['NONE', 'SUBTLE', 'IMMERSIVE']);
 export const publicEventCodeSchema = z.string().regex(/^[A-HJ-NP-Z2-9]{8,10}$/);
 
 const nullableText = (maximum: number) => z.string().trim().max(maximum).nullable();
+const nullableRichText = (maximum: number) => richTextSchema(maximum).nullable();
 const nullableUrl = z
   .string()
   .trim()
@@ -47,6 +49,32 @@ export const eventMediaReferenceSchema = z
     { message: 'Use an HTTPS URL or a protected /private-media event path' },
   );
 
+const supportedImagePath = (value: string) => /\.(?:avif|gif|jpe?g|png|webp)$/i.test(value);
+
+export const eventThumbnailReferenceSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine((value) => {
+    if (
+      /^\/private-media\/[a-z0-9-]+\/[A-Za-z0-9._/-]+$/i.test(value) &&
+      !value.split('/').includes('..')
+    ) {
+      return supportedImagePath(value);
+    }
+    try {
+      const url = new URL(value);
+      return (
+        url.protocol === 'https:' &&
+        !url.username &&
+        !url.password &&
+        supportedImagePath(url.pathname)
+      );
+    } catch {
+      return false;
+    }
+  }, 'Use a supported HTTPS or managed event image');
+
 export const publicEventThumbnailReferenceSchema = z
   .string()
   .trim()
@@ -63,7 +91,12 @@ export const publicEventThumbnailReferenceSchema = z
       }
       try {
         const url = new URL(value);
-        return url.protocol === 'https:' && !url.username && !url.password;
+        return (
+          url.protocol === 'https:' &&
+          !url.username &&
+          !url.password &&
+          supportedImagePath(url.pathname)
+        );
       } catch {
         return false;
       }
@@ -78,9 +111,9 @@ export const localizedEventContentSchema = z.object({
   title: z.string().trim().min(1).max(180),
   celebrantName: z.string().trim().min(1).max(120),
   venueName: nullableText(200),
-  hostMessage: nullableText(4000),
-  arrivalInstructions: nullableText(2000),
-  parkingInstructions: nullableText(2000),
+  hostMessage: nullableRichText(4000),
+  arrivalInstructions: nullableRichText(2000),
+  parkingInstructions: nullableRichText(2000),
   thumbnailAltText: z.string().trim().min(1).max(240),
 });
 
@@ -154,7 +187,7 @@ export const hostEventSummarySchema = z.object({
   status: eventStatusSchema,
   templateKey: eventTemplateKeySchema,
   primaryHostname: z.string().nullable(),
-  thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+  thumbnailImageRef: eventThumbnailReferenceSchema.nullable(),
   formattedAddress: z.string().max(1000).nullable(),
   readiness: z.object({
     locationComplete: z.boolean(),
@@ -180,7 +213,7 @@ export const hostEventDetailSchema = hostEventSummarySchema.extend({
   mapsUrl: nullableUrl,
   publicThumbnailRef: publicEventThumbnailReferenceSchema.nullable(),
   rsvpDeadline: z.iso.datetime().nullable(),
-  thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+  thumbnailImageRef: eventThumbnailReferenceSchema.nullable(),
   staticBackgroundRef: eventMediaReferenceSchema.nullable(),
   localizedContent: eventContentByLocaleSchema,
   template: eventTemplateConfigurationSchema,
@@ -217,7 +250,7 @@ export const updateHostEventInputSchema = z
     latitude: latitudeSchema,
     longitude: longitudeSchema,
     mapsUrl: nullableUrl,
-    thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+    thumbnailImageRef: eventThumbnailReferenceSchema.nullable(),
     publicThumbnailRef: publicEventThumbnailReferenceSchema.nullable(),
     staticBackgroundRef: eventMediaReferenceSchema.nullable(),
     rsvpDeadline: z.iso.datetime().nullable(),

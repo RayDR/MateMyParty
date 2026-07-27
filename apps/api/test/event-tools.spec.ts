@@ -71,14 +71,45 @@ describe('event maps and calendar tools', () => {
   it('URL-encodes address fallback for Google and Apple Maps', () => {
     const links = buildMapLinks(event)!;
     expect(links.formattedAddress).toContain('Fun & Games');
-    expect(new URL(links.googleMapsUrl).searchParams.get('query')).toBe(links.formattedAddress);
-    expect(new URL(links.appleMapsUrl).searchParams.get('q')).toBe(links.formattedAddress);
+    const completeLocation = `Play & Learn, ${links.formattedAddress}`;
+    expect(new URL(links.googleMapsUrl!).searchParams.get('query')).toBe(completeLocation);
+    expect(new URL(links.appleMapsUrl!).searchParams.get('q')).toBe(completeLocation);
     expect(links.usesCoordinates).toBe(false);
+  });
+
+  it("uses Raymundo's complete venue and address for both providers", () => {
+    const links = buildMapLinks({
+      ...event,
+      venueName: 'Kids Empire Dallas Hillcrest',
+      addressLine1: '6859 Arapaho Rd',
+      addressLine2: null,
+      city: 'Dallas',
+      region: 'TX',
+      postalCode: '75248',
+      countryCode: 'US',
+      mapsUrl: null,
+    })!;
+    const location = 'Kids Empire Dallas Hillcrest, 6859 Arapaho Rd, Dallas, TX, 75248, US';
+    expect(new URL(links.googleMapsUrl!).searchParams.get('query')).toBe(location);
+    expect(new URL(links.appleMapsUrl!).searchParams.get('q')).toBe(location);
+  });
+
+  it('keeps a configured URL as the only action when provider data is incomplete', () => {
+    const links = buildMapLinks({
+      ...event,
+      addressLine1: null,
+      city: null,
+      countryCode: null,
+      mapsUrl: 'https://maps.example.test/configured-place',
+    })!;
+    expect(links.configuredMapsUrl).toBe('https://maps.example.test/configured-place');
+    expect(links.googleMapsUrl).toBeNull();
+    expect(links.appleMapsUrl).toBeNull();
   });
 
   it('prefers configured coordinates and hides actions for incomplete locations', () => {
     const coordinates = buildMapLinks({ ...event, latitude: 32.8, longitude: -96.8 })!;
-    expect(new URL(coordinates.googleMapsUrl).searchParams.get('query')).toBe('32.8,-96.8');
+    expect(new URL(coordinates.googleMapsUrl!).searchParams.get('query')).toBe('32.8,-96.8');
     expect(coordinates.usesCoordinates).toBe(true);
     expect(
       buildMapLinks({

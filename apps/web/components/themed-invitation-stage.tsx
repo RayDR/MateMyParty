@@ -11,6 +11,7 @@ export function ThemedInvitationStage({
   mediaDisabled = false,
   forceReducedMotion = false,
   containedControls = false,
+  mediaUnlocked = true,
   children,
 }: {
   presentation: InvitationPresentation;
@@ -19,6 +20,7 @@ export function ThemedInvitationStage({
   mediaDisabled?: boolean;
   forceReducedMotion?: boolean;
   containedControls?: boolean;
+  mediaUnlocked?: boolean;
   children: ReactNode;
 }) {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(forceReducedMotion);
@@ -146,7 +148,7 @@ export function ThemedInvitationStage({
             />
           </>
         ) : null}
-        {presentation.audioRef && !mediaDisabled ? (
+        {presentation.audioRef && !mediaDisabled && mediaUnlocked ? (
           <>
             <audio
               ref={audio}
