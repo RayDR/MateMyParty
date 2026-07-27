@@ -4,4 +4,6 @@ dist
 coverage
 pnpm-lock.yaml
 apps/web/next-env.d.ts
+
 .deploy-backup-*
+deploy/logs/

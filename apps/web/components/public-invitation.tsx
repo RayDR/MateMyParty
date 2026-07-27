@@ -140,13 +140,13 @@ export function PublicInvitation({
       forceReducedMotion={reducedMotion}
       containedControls={preview}
       mediaUnlocked={phase !== 'closed'}
-      controlsRaised={phase === 'full'}
+      controlsRaised={phase !== 'closed'}
     >
       <div
         lang={locale}
         data-invitation-side={phase === 'full' ? 'back' : 'front'}
         data-invitation-phase={phase}
-        className={`mx-auto min-h-screen max-w-5xl overflow-x-clip px-3 pt-4 @md:px-8 ${phase === 'full' ? 'pb-44' : 'pb-24'}`}
+        className={`mx-auto min-h-screen w-full min-w-0 max-w-5xl overflow-x-clip px-3 pt-4 @md:px-8 ${phase === 'closed' ? 'pb-8' : 'pb-32'}`}
       >
         <header className="flex flex-wrap items-center justify-between gap-3">
           {preview ? (
@@ -295,7 +295,7 @@ export function PublicInvitation({
                 aria-label={dictionary.invitation.eventDetails}
                 className="invitation-essential relative z-10 rounded-3xl border border-white/10 bg-slate-950/62 p-4 @md:p-6"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start justify-between gap-3">
                   <Detail label={dictionary.invitation.when} value={dateTime} />
                   <CalendarActions
                     calendar={calendar}
@@ -481,7 +481,7 @@ function RsvpPanel({
         <section
           role="dialog"
           aria-labelledby="rsvp-panel-title"
-          className={`${useAbsolutePositioning ? 'absolute' : 'fixed'} invitation-rsvp-panel inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-h-[min(68dvh,42rem)] max-w-2xl overflow-y-auto rounded-3xl border border-cyan-300/20 bg-slate-950/96 p-5 shadow-2xl backdrop-blur-xl @md:p-7`}
+          className={`${useAbsolutePositioning ? 'absolute' : 'fixed'} invitation-rsvp-panel inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-50 mx-auto max-h-[min(68dvh,42rem)] w-auto min-w-0 max-w-2xl overflow-x-hidden overflow-y-auto rounded-3xl border border-cyan-300/20 bg-slate-950/96 p-5 shadow-2xl backdrop-blur-xl @md:p-7`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -662,10 +662,10 @@ function RsvpPanel({
       ) : null}
       <footer
         aria-label={dictionary.invitation.rsvpTitle}
-        className={`${useAbsolutePositioning ? 'absolute' : 'fixed'} invitation-rsvp-footer inset-x-0 bottom-0 z-40 border-t border-white/15 bg-slate-950/92 px-3 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] shadow-[0_-1rem_3rem_rgb(2_6_23_/_35%)] backdrop-blur-xl`}
+        className={`${useAbsolutePositioning ? 'absolute' : 'fixed'} invitation-rsvp-footer inset-x-0 bottom-0 z-40 w-full max-w-[100dvw] overflow-x-clip border-t border-white/15 bg-slate-950/96 px-2 pt-2 pb-[calc(.45rem+env(safe-area-inset-bottom))] shadow-[0_-0.5rem_1.5rem_rgb(2_6_23_/_24%)] backdrop-blur-xl`}
       >
-        <div className="mx-auto flex max-w-2xl items-center gap-2">
-          <p className="mr-auto hidden min-w-0 text-sm font-bold text-cyan-100 @sm:block">
+        <div className="mx-auto grid max-w-2xl grid-cols-3 items-stretch gap-1">
+          <p className="col-span-3 hidden min-w-0 truncate px-2 text-center text-xs font-bold text-cyan-100 @sm:block">
             {response
               ? `${dictionary.invitation.rsvpCurrent}: ${statusLabel(response.status, dictionary)}`
               : dictionary.invitation.rsvpQuestion}
@@ -673,7 +673,7 @@ function RsvpPanel({
           <RsvpQuickAction
             label={dictionary.invitation.rsvpYesShort}
             title={dictionary.invitation.rsvpAccepted}
-            selected={response?.status === 'ACCEPTED'}
+            selected={(editing ? status : response?.status) === 'ACCEPTED'}
             disabled={!responseEnabled}
             icon={<Check aria-hidden size={18} />}
             onClick={() => {
@@ -686,7 +686,7 @@ function RsvpPanel({
           <RsvpQuickAction
             label={dictionary.invitation.rsvpNoShort}
             title={dictionary.invitation.rsvpDeclined}
-            selected={response?.status === 'DECLINED'}
+            selected={(editing ? status : response?.status) === 'DECLINED'}
             disabled={!responseEnabled}
             icon={<X aria-hidden size={18} />}
             onClick={() => {
@@ -699,7 +699,7 @@ function RsvpPanel({
           <RsvpQuickAction
             label={dictionary.invitation.rsvpMaybeShort}
             title={dictionary.invitation.rsvpNotSure}
-            selected={response?.status === 'NOT_SURE'}
+            selected={(editing ? status : response?.status) === 'NOT_SURE'}
             disabled={!responseEnabled}
             icon={<HelpCircle aria-hidden size={18} />}
             onClick={() => {
@@ -719,7 +719,7 @@ function RsvpPanel({
                 setEditing(false);
                 setPanelOpen(true);
               }}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/15 disabled:opacity-45"
+              className="col-span-3 mx-auto flex size-11 shrink-0 items-center justify-center rounded-full border border-white/15 disabled:opacity-45"
             >
               <Pencil aria-hidden size={17} />
             </button>
@@ -756,10 +756,10 @@ function RsvpQuickAction({
       aria-pressed={selected}
       disabled={disabled}
       onClick={onClick}
-      className={`flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-full px-2 text-xs font-black @sm:flex-none @sm:px-4 ${selected ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-white'} disabled:cursor-not-allowed disabled:opacity-45`}
+      className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl px-1.5 py-1 text-[11px] font-black leading-tight transition-colors ${selected ? 'bg-cyan-300 text-slate-950 shadow-inner' : 'bg-white/5 text-white hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-45`}
     >
       {icon}
-      <span className="truncate">{label}</span>
+      <span className="max-w-full truncate">{label}</span>
     </button>
   );
 }
@@ -829,7 +829,7 @@ function MapActions({
               <span className="sr-only">{dictionary.invitation.mapProviders}</span>
               <ChevronDown aria-hidden size={18} />
             </summary>
-            <div className="absolute top-full right-0 z-30 mt-2 grid w-[min(17rem,calc(100vw-2rem))] gap-2 rounded-2xl border border-white/15 bg-slate-950 p-3 text-left shadow-2xl">
+            <div className="absolute top-full right-0 z-50 mt-2 grid w-[min(17rem,calc(100dvw-2rem))] max-w-[calc(100dvw-2rem)] gap-2 overflow-hidden rounded-2xl border border-white/15 bg-slate-950 p-3 text-left shadow-2xl">
               {maps.googleMapsUrl ? (
                 <ExternalAction
                   href={maps.googleMapsUrl}
@@ -915,7 +915,7 @@ function CalendarActions({
       >
         <CalendarPlus aria-hidden size={19} />
       </summary>
-      <div className="absolute top-full right-0 z-30 mt-2 grid w-[min(18rem,calc(100vw-2rem))] gap-2 rounded-2xl border border-white/15 bg-slate-950 p-3 shadow-2xl">
+      <div className="absolute top-full right-0 z-50 mt-2 grid w-[min(18rem,calc(100dvw-2rem))] max-w-[calc(100dvw-2rem)] gap-2 overflow-hidden rounded-2xl border border-white/15 bg-slate-950 p-3 shadow-2xl">
         <ExternalAction
           href={calendar.googleCalendarUrl}
           label={dictionary.invitation.googleCalendar}
@@ -928,7 +928,7 @@ function CalendarActions({
           type="button"
           disabled={preview}
           onClick={(event) => void download(event)}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 w-full min-w-0 items-center gap-2 whitespace-normal break-words rounded-xl bg-violet-500 px-4 py-2 text-left text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
         >
           <CalendarPlus aria-hidden size={18} />
           {dictionary.invitation.appleCalendar}
@@ -937,7 +937,7 @@ function CalendarActions({
           type="button"
           disabled={preview}
           onClick={(event) => void download(event)}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 w-full min-w-0 items-center gap-2 whitespace-normal break-words rounded-xl border border-white/20 px-4 py-2 text-left text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Download aria-hidden size={18} />
           {dictionary.invitation.downloadCalendar}
@@ -971,7 +971,7 @@ function ExternalAction({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${primary ? 'bg-amber-300 text-slate-950 shadow-lg hover:bg-amber-200' : 'bg-cyan-700 text-white hover:bg-cyan-600'}`}
+      className={`inline-flex min-h-11 w-full min-w-0 items-center gap-2 whitespace-normal break-words rounded-xl px-4 py-2 text-left text-sm font-bold ${primary ? 'bg-amber-300 text-slate-950 shadow-lg hover:bg-amber-200' : 'bg-cyan-700 text-white hover:bg-cyan-600'}`}
     >
       {icon === 'map' ? <MapPin aria-hidden size={18} /> : null}
       {icon === 'calendar' ? <CalendarPlus aria-hidden size={18} /> : null}
@@ -1044,7 +1044,7 @@ function Detail({
   supporting?: string;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs font-bold text-cyan-200">{label}</p>
       <p className="mt-1 text-base text-slate-50">{value}</p>
       {supporting ? <p className="mt-1 text-sm text-slate-300">{supporting}</p> : null}
