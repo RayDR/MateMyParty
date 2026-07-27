@@ -13,6 +13,12 @@ export const hostEventDetail: HostEventDetail = {
   templateKey: 'kids-night-dragon',
   primaryHostname: 'raymundo6th.domoforge.com',
   thumbnailImageRef: null,
+  formattedAddress: null,
+  readiness: {
+    locationComplete: false,
+    scheduleComplete: true,
+    thumbnailConfigured: false,
+  },
   statistics: {
     guestCount: 12,
     invitationCount: 8,
@@ -39,7 +45,11 @@ export const hostEventDetail: HostEventDetail = {
   region: null,
   postalCode: null,
   countryCode: null,
+  latitude: null,
+  longitude: null,
   mapsUrl: null,
+  publicThumbnailRef: null,
+  rsvpDeadline: null,
   staticBackgroundRef: null,
   localizedContent: {
     'en-US': {
@@ -48,6 +58,7 @@ export const hostEventDetail: HostEventDetail = {
       venueName: 'Kids Empire Dallas Hillcrest',
       hostMessage: null,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: 'Raymundo’s 6th birthday',
     },
     'es-MX': {
@@ -56,6 +67,7 @@ export const hostEventDetail: HostEventDetail = {
       venueName: 'Kids Empire Dallas Hillcrest',
       hostMessage: null,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: 'Sexto cumpleaños de Raymundo',
     },
   },

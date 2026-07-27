@@ -10,6 +10,7 @@ import {
 } from '@matemyparty/contracts';
 import type { eventLocalizations, events } from '@matemyparty/database';
 import { getDictionary, type Locale } from '@matemyparty/i18n';
+import { buildCalendarEvent, buildMapLinks } from './event-tools';
 
 type EventRow = typeof events.$inferSelect;
 type LocalizationRow = typeof eventLocalizations.$inferSelect;
@@ -99,6 +100,8 @@ export function presentPrivateInvitation(
       region: record.event.region,
       postalCode: record.event.postalCode,
       countryCode: record.event.countryCode,
+      latitude: record.event.latitude,
+      longitude: record.event.longitude,
       mapsUrl: record.event.mapsUrl,
       rsvpDeadline: record.event.rsvpDeadline?.toISOString() ?? null,
       localizedContent,
@@ -114,6 +117,15 @@ export function presentPrivateInvitation(
     invitationLocale,
     openedPreviously,
     rsvp,
+    tools: {
+      maps: buildMapLinks(record.event),
+      calendar: buildCalendarEvent(
+        record.event,
+        record.localizations.find((candidate) => candidate.locale === invitationLocale),
+        invitationLocale,
+        buildInvitationUrl(record.primaryHostname, '/'),
+      ),
+    },
     shareMetadata: {
       title: selected.title,
       description: getDictionary(invitationLocale).invitation.shareGeneric.replace(
@@ -121,10 +133,10 @@ export function presentPrivateInvitation(
         selected.title,
       ),
       hostname: record.primaryHostname,
-      thumbnailImageRef: record.event.thumbnailImageRef,
+      thumbnailImageRef: record.event.publicThumbnailRef,
       thumbnailAltText: selected.thumbnailAltText,
     },
-    capabilities: { canRespond, canAddToCalendar: false },
+    capabilities: { canRespond, canAddToCalendar: true },
   });
 }
 
@@ -160,8 +172,13 @@ function localization(record: PresentationRecord, locale: Locale) {
     venueName: row?.venueName ?? record.event.venueName,
     hostMessage: row?.hostMessage ?? record.event.hostMessage,
     arrivalInstructions: row?.arrivalInstructions ?? null,
+    parkingInstructions: row?.parkingInstructions ?? null,
     thumbnailAltText: row?.thumbnailAltText ?? record.event.title,
   };
+}
+
+function buildInvitationUrl(hostname: string | null, path: string): string {
+  return hostname ? `https://${hostname}${path}` : `https://matemyparty.domoforge.com${path}`;
 }
 
 function normalizeLocale(locale: string): Locale {

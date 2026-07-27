@@ -8,6 +8,6 @@ import { PublicEventCodeService } from './public-event-code.service';
 @Module({
   controllers: [EventsController, HostEventsController],
   providers: [EventsRepository, EventsService, PublicEventCodeService],
-  exports: [EventsRepository],
+  exports: [EventsRepository, EventsService],
 })
 export class EventsModule {}

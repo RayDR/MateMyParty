@@ -91,6 +91,7 @@ function EventCard({
   locale: Locale;
   dictionary: Dictionary;
 }) {
+  const [copied, setCopied] = useState<'address' | 'hostname' | null>(null);
   const publicUrl = event.primaryHostname
     ? `https://${event.primaryHostname}/`
     : `/events/${encodeURIComponent(event.publicSlug)}`;
@@ -167,6 +168,41 @@ function EventCard({
               </dd>
             </div>
           </dl>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+            <Readiness
+              complete={event.readiness.locationComplete}
+              completeLabel={dictionary.host.locationComplete}
+              incompleteLabel={dictionary.host.locationIncomplete}
+            />
+            <Readiness
+              complete={event.readiness.scheduleComplete}
+              completeLabel={dictionary.host.scheduleComplete}
+              incompleteLabel={dictionary.host.scheduleIncomplete}
+            />
+            <Readiness
+              complete={event.readiness.thumbnailConfigured}
+              completeLabel={dictionary.host.thumbnailConfigured}
+              incompleteLabel={dictionary.host.thumbnailMissing}
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {event.formattedAddress ? (
+              <CopyButton
+                label={copied === 'address' ? dictionary.host.copied : dictionary.host.copyAddress}
+                value={event.formattedAddress}
+                onCopied={() => setCopiedTemporarily('address', setCopied)}
+              />
+            ) : null}
+            {event.primaryHostname ? (
+              <CopyButton
+                label={
+                  copied === 'hostname' ? dictionary.host.copied : dictionary.host.copyHostname
+                }
+                value={event.primaryHostname}
+                onCopied={() => setCopiedTemporarily('hostname', setCopied)}
+              />
+            ) : null}
+          </div>
         </div>
       </article>
       <nav
@@ -182,12 +218,67 @@ function EventCard({
         <Action href={`/host/events/${encodeURIComponent(event.identifier)}/preview`}>
           {dictionary.host.previewInvitation}
         </Action>
+        <Action href={`/host/events/${encodeURIComponent(event.identifier)}#calendar-preview`}>
+          {dictionary.host.calendarPreview}
+        </Action>
+        <Action href={`/host/events/${encodeURIComponent(event.identifier)}/guests`}>
+          {dictionary.host.invitationPreview}
+        </Action>
         <Action href={publicUrl} external>
           {dictionary.host.openPublicPage}
         </Action>
       </nav>
     </Card>
   );
+}
+
+function Readiness({
+  complete,
+  completeLabel,
+  incompleteLabel,
+}: {
+  complete: boolean;
+  completeLabel: string;
+  incompleteLabel: string;
+}) {
+  return (
+    <span
+      className={`rounded-full px-3 py-1 ${
+        complete ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-100'
+      }`}
+    >
+      {complete ? '✓ ' : '○ '}
+      {complete ? completeLabel : incompleteLabel}
+    </span>
+  );
+}
+
+function CopyButton({
+  label,
+  value,
+  onCopied,
+}: {
+  label: string;
+  value: string;
+  onCopied: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => void navigator.clipboard.writeText(value).then(onCopied)}
+      className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold"
+    >
+      {label}
+    </button>
+  );
+}
+
+function setCopiedTemporarily(
+  value: 'address' | 'hostname',
+  setCopied: (value: 'address' | 'hostname' | null) => void,
+) {
+  setCopied(value);
+  window.setTimeout(() => setCopied(null), 1800);
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

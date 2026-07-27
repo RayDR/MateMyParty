@@ -197,7 +197,17 @@ curl --fail --resolve raymundo6th.domoforge.com:80:127.0.0.1 \
   http://raymundo6th.domoforge.com/
 ```
 
-Both Nginx files suppress access-log entries whose path begins with `/i/`; error logging remains enabled. The TLS configuration also sends `no-store` for invitation and host routes. `/health` and non-invitation `/api/*` routes go to Nest, while `/api/invitations/*` is deliberately unavailable through the public proxy so credential-bearing resolution and lookup traffic can use only the loopback Next-to-API path. `/internal/*` stays on Next, and `/ws/*` is reserved without claiming a websocket implementation. Next applies `noindex`, `no-store`, and `no-referrer` headers to both `/i/*` and the verified `/invitation` session route.
+Both Nginx files suppress access-log entries whose path begins with `/i/`; error logging remains enabled. The TLS configuration also sends `no-store` for invitation and host routes. `/health` and non-invitation `/api/*` routes go to Nest, while `/api/invitations/*` and `/api/calendar*` are deliberately unavailable through the public proxy so credential-bearing traffic can use only the loopback Next-to-API path. `/internal/*` stays on Next, and `/ws/*` is reserved without claiming a websocket implementation. Next applies `noindex`, `no-store`, and `no-referrer` headers to both `/i/*` and the verified `/invitation` session route.
+
+The final TLS site exposes only reviewed social images through a directory separate from protected media. Create it before configuring a local `publicThumbnailRef`; this command does not copy or publish any existing file:
+
+```bash
+sudo install -d -m 02750 -o sysops -g www-data /forge/matemyparty-public-thumbnails
+sudo install -d -m 02750 -o sysops -g www-data \
+  /forge/matemyparty-public-thumbnails/raymundo-6
+```
+
+Place only a reviewed image in the event subdirectory with owner `sysops`, group `www-data`, and mode `0640`, then configure `/event-thumbnails/raymundo-6/<filename>` in the host editor. Never link this alias to `/forge/matemyparty-private-media`; video and audio remain protected.
 
 ## 8. TLS after DNS is correct
 

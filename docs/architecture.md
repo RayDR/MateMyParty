@@ -83,6 +83,18 @@ Both direct `/i/{token}` access and verified `/invitation` access resolve to the
 
 `/host/events/:identifier/preview` requires the host session and fetches synthetic preview data from the bearer-protected API. It can switch public/private experience, locale, viewport, media, and motion settings. The preview presenter does not query a guest or invitation and cannot call open tracking.
 
+## Location, calendar, countdown, and sharing
+
+Location and schedule remain event-owned data. PostgreSQL stores absolute timestamps in UTC plus the event's IANA time zone; rendering uses that zone. Coordinates are an optional validated pair and are never inferred. Provider links prefer coordinates, otherwise require address line 1, city, and country. Google and Apple links are encoded standard URLs and require no paid maps API. A validated host override is presented as an additional link.
+
+Calendar reads are a private capability. `GET /api/calendar` and `/api/calendar/ics` resolve the same permanent invitation token or temporary access grant as RSVP, but do not record an invitation open. The Next `/internal/calendar` boundary keeps credentials in a header or HttpOnly cookie and Nginx blocks direct public API access. Host calendar preview is bearer/session protected and uses a synthetic `/i/…` URL. Provider links use a documented 120-minute fallback only when `ends_at` is null; the stored event and ICS remain without a fabricated end.
+
+ICS generation is a pure domain utility with CRLF output, UTF-8 line folding, escaped text, a stable event-public-code UID, and a fixed slug-derived filename. It contains event-level content and the canonical invitation-entry URL, never a private token, guest contacts, party size, RSVP state, private notes, or invitation status.
+
+The countdown derives from the stored UTC instant on the client after hydration, then updates once per minute. This avoids server/client clock mismatches. It is rendered only inside the verified private contract and adds no motion.
+
+Social sharing uses only a localized event title, generic copy, canonical event hostname, alt text, and `public_thumbnail_ref`. Local public thumbnails live under `/event-thumbnails/<slug>/` and are physically separate from `/private-media/`; protected video and audio can never satisfy the public-thumbnail contract. Host sharing previews provide WhatsApp-style and Open Graph approximations, SMS character counts, calendar summaries, and copy actions without recording or claiming delivery.
+
 ## Temporary host protection
 
 Nest host controllers use a reusable timing-safe bearer-token guard. Production startup rejects a missing, short, or known example token. The web access form compares the secret only on the server and stores a derived HMAC value in an HttpOnly, SameSite=Strict cookie. Internal Next routes validate that cookie and add the bearer token server-side, so browser JavaScript never receives `HOST_ADMIN_TOKEN`.
@@ -91,4 +103,4 @@ This is intentionally isolated temporary protection. Real authentication will re
 
 ## Future providers
 
-Email, SMS, object storage, maps, calendar integrations, event sharing, payments, and AI can later sit behind provider interfaces owned by their feature modules. No provider or infrastructure is installed before a use case needs it. Maps, calendar downloads, and event sharing form the next domain milestone.
+Email, SMS, object storage, payments, and AI can later sit behind provider interfaces owned by their feature modules. No delivery provider or infrastructure is installed before a use case needs it. Transactional email delivery and tracking are the next domain milestone.

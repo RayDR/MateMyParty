@@ -8,11 +8,15 @@ describe('invitation metadata privacy', () => {
     const serialized = JSON.stringify(metadata);
     expect(metadata.title).toBe('Sexto cumpleaños de Raymundo');
     expect(serialized).toContain(
-      'https://raymundo6th.domoforge.com/private-media/raymundo-6/thumbnail.webp',
+      'https://raymundo6th.domoforge.com/event-thumbnails/raymundo-6/thumbnail.webp',
     );
     expect(serialized).not.toContain('Family Sample');
     expect(serialized).not.toContain('2 adults');
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' });
+    expect(metadata.alternates).toMatchObject({
+      canonical: 'https://raymundo6th.domoforge.com/',
+    });
   });
 
   it('does not expose event metadata for an invalid invitation', () => {

@@ -2,8 +2,10 @@ import { z } from 'zod';
 import {
   eventMediaReferenceSchema,
   eventTemplateKeySchema,
+  publicEventThumbnailReferenceSchema,
   supportedEventLocaleSchema,
 } from './events.js';
+import { privateEventToolsSchema } from './event-tools.js';
 import { invitationCountModeSchema } from './invitations.js';
 import { publicRsvpResponseSchema } from './rsvp.js';
 
@@ -50,6 +52,7 @@ const privateInvitationLocaleSchema = z.object({
   venueName: z.string().nullable(),
   hostMessage: z.string().nullable(),
   arrivalInstructions: z.string().nullable(),
+  parkingInstructions: z.string().nullable(),
   thumbnailAltText: z.string().min(1).max(240),
 });
 
@@ -66,9 +69,17 @@ export const privateInvitationEventSchema = z.object({
   region: z.string().nullable(),
   postalCode: z.string().nullable(),
   countryCode: z.string().length(2).nullable(),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
   mapsUrl: z
     .url()
-    .refine((value) => value.startsWith('https://') || value.startsWith('http://'))
+    .max(2048)
+    .refine((value) => {
+      const url = new URL(value);
+      return (
+        (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password
+      );
+    })
     .nullable(),
   rsvpDeadline: z.iso.datetime().nullable(),
   localizedContent: z.object({
@@ -90,16 +101,17 @@ export const privateInvitationSchema = z.object({
   invitationLocale: supportedEventLocaleSchema,
   openedPreviously: z.boolean(),
   rsvp: publicRsvpResponseSchema.nullable(),
+  tools: privateEventToolsSchema,
   shareMetadata: z.object({
-    title: z.string().min(1),
-    description: z.string().min(1),
-    hostname: z.string().nullable(),
-    thumbnailImageRef: eventMediaReferenceSchema.nullable(),
-    thumbnailAltText: z.string().min(1),
+    title: z.string().min(1).max(180),
+    description: z.string().min(1).max(600),
+    hostname: z.string().min(1).max(253).nullable(),
+    thumbnailImageRef: publicEventThumbnailReferenceSchema.nullable(),
+    thumbnailAltText: z.string().min(1).max(240),
   }),
   capabilities: z.object({
     canRespond: z.boolean(),
-    canAddToCalendar: z.literal(false),
+    canAddToCalendar: z.literal(true),
   }),
 });
 

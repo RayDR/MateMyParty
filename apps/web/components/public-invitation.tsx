@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type {
+  CalendarEvent,
   PrivateInvitation as PrivateInvitationData,
   PublicRsvpResponse,
   RsvpStatus,
@@ -9,6 +10,7 @@ import type {
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
 import { LanguageSelector } from './language-selector';
 import { ThemedInvitationStage } from './themed-invitation-stage';
+import { EventCountdown } from './event-countdown';
 
 export function PublicInvitation({
   invitation,
@@ -26,6 +28,7 @@ export function PublicInvitation({
   accessToken?: string;
 }) {
   const [locale, setLocale] = useState(initialLocale);
+  const [calendar, setCalendar] = useState<CalendarEvent>(invitation.tools.calendar);
   const dictionary = getDictionary(locale);
   const { event } = invitation;
   const content = event.localizedContent[locale];
@@ -52,6 +55,25 @@ export function PublicInvitation({
   ]
     .filter(Boolean)
     .join(', ');
+  useEffect(() => {
+    if (preview || locale === invitation.tools.calendar.locale) {
+      setCalendar(invitation.tools.calendar);
+      return;
+    }
+    const controller = new AbortController();
+    void fetch(`/internal/calendar?locale=${locale}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: accessToken ? { 'x-invitation-token': accessToken } : {},
+    })
+      .then(async (response) => {
+        if (response.ok) setCalendar((await response.json()) as CalendarEvent);
+      })
+      .catch(() => {
+        /* The original locale calendar remains usable if localization refresh fails. */
+      });
+    return () => controller.abort();
+  }, [accessToken, locale, preview]);
   return (
     <ThemedInvitationStage
       presentation={event.presentation}
@@ -99,6 +121,11 @@ export function PublicInvitation({
                 )}
               </p>
             </div>
+            <EventCountdown
+              startsAt={event.startsAt}
+              endsAt={event.endsAt}
+              dictionary={dictionary}
+            />
             <dl className="mt-8 grid gap-3 @md:grid-cols-2">
               <Detail label={dictionary.event.date} value={dateTime} />
               {endsAt ? <Detail label={dictionary.invitation.endTime} value={endsAt} /> : null}
@@ -113,15 +140,8 @@ export function PublicInvitation({
                 value={partyLabel(invitation, dictionary)}
               />
             </dl>
-            {event.mapsUrl ? (
-              <a
-                href={event.mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cyan-600 px-4 py-2 font-bold"
-              >
-                {dictionary.invitation.openMaps}
-              </a>
+            {invitation.tools.maps ? (
+              <MapActions maps={invitation.tools.maps} dictionary={dictionary} />
             ) : null}
             {content.arrivalInstructions ? (
               <section className="mt-6 rounded-2xl bg-white/5 p-4">
@@ -131,9 +151,24 @@ export function PublicInvitation({
                 <p className="mt-2 text-slate-200">{content.arrivalInstructions}</p>
               </section>
             ) : null}
+            {content.parkingInstructions ? (
+              <section className="mt-4 rounded-2xl bg-white/5 p-4">
+                <h2 className="font-bold text-cyan-200">
+                  {dictionary.invitation.parkingInstructions}
+                </h2>
+                <p className="mt-2 text-slate-200">{content.parkingInstructions}</p>
+              </section>
+            ) : null}
             {content.hostMessage ? (
               <p className="mt-7 text-center text-lg text-slate-100">{content.hostMessage}</p>
             ) : null}
+            <CalendarActions
+              calendar={calendar}
+              locale={locale}
+              dictionary={dictionary}
+              accessToken={accessToken}
+              preview={preview}
+            />
             <RsvpPanel
               invitation={invitation}
               dictionary={dictionary}
@@ -269,9 +304,6 @@ function RsvpPanel({
               {response.guestMessage}
             </p>
           ) : null}
-          <p className="mt-3 rounded-xl border border-dashed border-white/15 p-3 text-xs text-slate-400">
-            {dictionary.invitation.rsvpCalendarPlaceholder}
-          </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
@@ -390,6 +422,122 @@ function RsvpPanel({
         </form>
       )}
     </section>
+  );
+}
+
+function MapActions({
+  maps,
+  dictionary,
+}: {
+  maps: PrivateInvitationData['tools']['maps'] & object;
+  dictionary: Dictionary;
+}) {
+  const [copied, setCopied] = useState(false);
+  async function copyAddress() {
+    await navigator.clipboard.writeText(maps.formattedAddress);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+  return (
+    <section className="mt-6" aria-label={dictionary.invitation.address}>
+      <div className="flex flex-wrap gap-3">
+        <ExternalAction href={maps.googleMapsUrl} label={dictionary.invitation.googleMaps} />
+        <ExternalAction href={maps.appleMapsUrl} label={dictionary.invitation.appleMaps} />
+        {maps.configuredMapsUrl ? (
+          <ExternalAction href={maps.configuredMapsUrl} label={dictionary.invitation.openMaps} />
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void copyAddress()}
+          className="min-h-11 rounded-xl border border-cyan-300/30 bg-cyan-950/60 px-4 py-2 font-bold"
+        >
+          {copied ? dictionary.invitation.addressCopied : dictionary.invitation.copyAddress}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function CalendarActions({
+  calendar,
+  locale,
+  dictionary,
+  accessToken,
+  preview,
+}: {
+  calendar: CalendarEvent;
+  locale: Locale;
+  dictionary: Dictionary;
+  accessToken?: string;
+  preview: boolean;
+}) {
+  const [error, setError] = useState(false);
+  async function download() {
+    if (preview) return;
+    setError(false);
+    const response = await fetch(`/internal/calendar/ics?locale=${locale}`, {
+      cache: 'no-store',
+      headers: accessToken ? { 'x-invitation-token': accessToken } : {},
+    });
+    if (!response.ok) {
+      setError(true);
+      return;
+    }
+    const url = window.URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = calendar.filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  }
+  return (
+    <section className="mt-8 rounded-2xl border border-violet-300/20 bg-violet-950/40 p-5">
+      <h2 className="text-lg font-black text-violet-100">{dictionary.invitation.calendarTitle}</h2>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <ExternalAction
+          href={calendar.googleCalendarUrl}
+          label={dictionary.invitation.googleCalendar}
+        />
+        <ExternalAction
+          href={calendar.outlookCalendarUrl}
+          label={dictionary.invitation.outlookCalendar}
+        />
+        <button
+          type="button"
+          disabled={preview}
+          onClick={() => void download()}
+          className="min-h-11 rounded-xl bg-violet-500 px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {dictionary.invitation.appleCalendar}
+        </button>
+        <button
+          type="button"
+          disabled={preview}
+          onClick={() => void download()}
+          className="min-h-11 rounded-xl border border-white/20 px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {dictionary.invitation.downloadCalendar}
+        </button>
+      </div>
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-red-200">
+          {dictionary.invitation.calendarDownloadError}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ExternalAction({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex min-h-11 items-center rounded-xl bg-cyan-600 px-4 py-2 font-bold"
+    >
+      {label}
+    </a>
   );
 }
 

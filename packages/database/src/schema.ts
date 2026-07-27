@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -84,6 +85,8 @@ export const events = pgTable(
     region: text('region'),
     postalCode: text('postal_code'),
     countryCode: text('country_code'),
+    latitude: doublePrecision('latitude'),
+    longitude: doublePrecision('longitude'),
     publicSlug: text('public_slug').notNull(),
     publicCode: text('public_code').notNull(),
     templateKey: text('template_key').notNull(),
@@ -96,6 +99,7 @@ export const events = pgTable(
     audioEnabled: boolean('audio_enabled').notNull().default(false),
     overlayIntensity: integer('overlay_intensity').notNull().default(50),
     thumbnailImageRef: text('thumbnail_image_ref'),
+    publicThumbnailRef: text('public_thumbnail_ref'),
     staticBackgroundRef: text('static_background_ref'),
     mapsUrl: text('maps_url'),
     hostMessage: text('host_message'),
@@ -115,6 +119,26 @@ export const events = pgTable(
       'events_end_after_start_check',
       sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
     ),
+    check(
+      'events_coordinates_pair_check',
+      sql`(${table.latitude} is null and ${table.longitude} is null) or (${table.latitude} is not null and ${table.longitude} is not null)`,
+    ),
+    check(
+      'events_latitude_range_check',
+      sql`${table.latitude} is null or ${table.latitude} between -90 and 90`,
+    ),
+    check(
+      'events_longitude_range_check',
+      sql`${table.longitude} is null or ${table.longitude} between -180 and 180`,
+    ),
+    check(
+      'events_maps_url_scheme_check',
+      sql`${table.mapsUrl} is null or ${table.mapsUrl} ~ '^https?://'`,
+    ),
+    check(
+      'events_public_thumbnail_ref_check',
+      sql`${table.publicThumbnailRef} is null or ${table.publicThumbnailRef} ~* '^(https://|/event-thumbnails/[a-z0-9-]+/[A-Za-z0-9._/-]+[.](avif|gif|jpe?g|png|webp)$)'`,
+    ),
   ],
 );
 
@@ -131,6 +155,7 @@ export const eventLocalizations = pgTable(
     venueName: text('venue_name'),
     hostMessage: text('host_message'),
     arrivalInstructions: text('arrival_instructions'),
+    parkingInstructions: text('parking_instructions'),
     thumbnailAltText: text('thumbnail_alt_text').notNull(),
     ...auditColumns,
   },

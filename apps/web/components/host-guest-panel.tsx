@@ -1045,6 +1045,7 @@ function SharingPreview({
   onCopy: () => void;
   onClose: () => void;
 }) {
+  const [copiedTemplate, setCopiedTemplate] = useState<string | null>(null);
   const smsText = preview
     ? publicUrl
       ? preview.smsText.replace(/https?:\/\/[^\s]+\/i\/…|\/i\/…/, publicUrl)
@@ -1077,9 +1078,9 @@ function SharingPreview({
               <p className="p-3 text-xs font-bold text-emerald-300">
                 {dictionary.host.whatsAppPreview}
               </p>
-              {preview.thumbnailImageRef ? (
+              {preview.publicThumbnailRef ? (
                 <img
-                  src={preview.thumbnailImageRef}
+                  src={preview.publicThumbnailRef}
                   alt={preview.thumbnailAltText}
                   className="h-40 w-full object-cover"
                 />
@@ -1090,15 +1091,18 @@ function SharingPreview({
                 <p className="mt-3 text-xs text-emerald-200">
                   {preview.hostname ?? dictionary.host.notAvailable}
                 </p>
+                <p className="mt-3 text-[11px] text-slate-400">
+                  {dictionary.host.whatsAppApproximation}
+                </p>
               </div>
             </section>
             <section className="overflow-hidden rounded-3xl border border-white/10 bg-white text-slate-900 shadow-xl">
               <p className="bg-slate-100 p-3 text-xs font-bold text-slate-600">
                 {dictionary.host.socialPreview}
               </p>
-              {preview.thumbnailImageRef ? (
+              {preview.publicThumbnailRef ? (
                 <img
-                  src={preview.thumbnailImageRef}
+                  src={preview.publicThumbnailRef}
                   alt={preview.thumbnailAltText}
                   className="h-40 w-full object-cover"
                 />
@@ -1118,6 +1122,28 @@ function SharingPreview({
               <p className="mt-3 rounded-2xl bg-blue-500 p-4 text-sm text-white sm:ml-auto sm:max-w-md">
                 {smsText}
               </p>
+              <p className="mt-2 text-right text-xs text-slate-400">
+                {dictionary.host.characterCount.replace(
+                  '{count}',
+                  String(Array.from(smsText).length),
+                )}
+              </p>
+            </section>
+            <section className="rounded-3xl border border-white/10 bg-slate-950 p-4 md:col-span-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+                {dictionary.host.calendarPreview}
+              </p>
+              <h3 className="mt-3 font-bold">{preview.calendar.title}</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                {new Intl.DateTimeFormat(preview.locale, {
+                  dateStyle: 'full',
+                  timeStyle: 'short',
+                  timeZone: preview.calendar.timezone,
+                }).format(new Date(preview.calendar.startsAt))}
+              </p>
+              {preview.calendar.location ? (
+                <p className="mt-1 text-sm text-slate-400">{preview.calendar.location}</p>
+              ) : null}
             </section>
           </div>
         )}
@@ -1134,6 +1160,28 @@ function SharingPreview({
           </div>
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">
+          {preview ? (
+            <>
+              <TemplateCopyButton
+                text={preview.invitationText}
+                label={dictionary.host.copyInvitationText}
+                copied={copiedTemplate === 'invitation'}
+                onCopied={() => setCopiedTemplateTemporarily('invitation', setCopiedTemplate)}
+              />
+              <TemplateCopyButton
+                text={smsText}
+                label={dictionary.host.copySmsText}
+                copied={copiedTemplate === 'sms'}
+                onCopied={() => setCopiedTemplateTemporarily('sms', setCopiedTemplate)}
+              />
+              <TemplateCopyButton
+                text={preview.calendar.googleCalendarUrl}
+                label={dictionary.host.copyCalendarLink}
+                copied={copiedTemplate === 'calendar'}
+                onCopied={() => setCopiedTemplateTemporarily('calendar', setCopiedTemplate)}
+              />
+            </>
+          ) : null}
           {publicUrl ? (
             <button onClick={onCopy} className="rounded-xl bg-cyan-600 px-5 py-3 font-bold">
               {copied ? dictionary.host.copied : dictionary.host.copyLink}
@@ -1148,6 +1196,33 @@ function SharingPreview({
       </div>
     </div>
   );
+}
+
+function TemplateCopyButton({
+  text,
+  label,
+  copied,
+  onCopied,
+}: {
+  text: string;
+  label: string;
+  copied: boolean;
+  onCopied: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => void navigator.clipboard.writeText(text).then(onCopied)}
+      className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold"
+    >
+      {copied ? '✓' : label}
+    </button>
+  );
+}
+
+function setCopiedTemplateTemporarily(value: string, setValue: (value: string | null) => void) {
+  setValue(value);
+  window.setTimeout(() => setValue(null), 1800);
 }
 
 function RsvpDetailModal({

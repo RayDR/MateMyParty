@@ -56,6 +56,14 @@ Event updates accept only shared-contract fields, supported locales, allowed tem
 
 Invitation activity can store a user agent truncated to 160 characters, one supported requested locale, and a referrer hostname. It does not store full referrer URLs or IP addresses. Infrastructure access logs must redact `/i/*` path segments because the URL itself contains a credential. Application code must never log request parameters for invitation routes.
 
+## Maps, calendars, and social previews
+
+Schedule, location, maps links, and calendar data exist only in `PrivateInvitation` or host contracts. The public event root remains structurally unable to carry them. Private calendar endpoints require a valid permanent token or unexpired access grant on every request; archived guests and revoked invitations receive the same neutral 404 as unknown credentials. Calendar reads may update a grant's last-used time but do not increment invitation opens.
+
+Address/provider values use `URL` and `URLSearchParams`; coordinates must be supplied as a valid pair within geographic ranges. Host map overrides accept HTTP(S) only. Calendar provider URLs and ICS use the canonical invitation-entry hostname rather than forwarding a private token to a third party. ICS text escapes backslashes, newlines, commas, and semicolons, folds long UTF-8 lines, uses a fixed slug-derived filename, and never interpolates guest email, phone, name, party size, RSVP, invitation status, or host-private notes. Nginx returns 404 for direct `/api/calendar` access so credentials pass only through the no-store same-origin Next boundary.
+
+Open Graph and Twitter metadata use event-only fields. Invalid or revoked links produce neutral product metadata. `public_thumbnail_ref` accepts HTTPS or `/event-thumbnails/<slug>/...`, while private video, audio, and fallback references remain limited to the protected media path. The public thumbnail directory is an explicit Nginx alias outside Git and outside the protected-media tree; its contents must be reviewed as intentionally public.
+
 ## Recommendations before public exposure
 
 - Terminate TLS and set `PUBLIC_APP_PROTOCOL=https`.

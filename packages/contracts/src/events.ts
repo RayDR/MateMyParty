@@ -22,10 +22,17 @@ const nullableText = (maximum: number) => z.string().trim().max(maximum).nullabl
 const nullableUrl = z
   .string()
   .trim()
+  .max(2048)
   .url()
-  .refine((value) => value.startsWith('https://') || value.startsWith('http://'), {
-    message: 'Only HTTP and HTTPS URLs are supported',
-  })
+  .refine(
+    (value) => {
+      const url = new URL(value);
+      return (
+        (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password
+      );
+    },
+    { message: 'Only credential-free HTTP and HTTPS URLs are supported' },
+  )
   .nullable();
 
 export const eventMediaReferenceSchema = z
@@ -40,12 +47,40 @@ export const eventMediaReferenceSchema = z
     { message: 'Use an HTTPS URL or a protected /private-media event path' },
   );
 
+export const publicEventThumbnailReferenceSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(
+    (value) => {
+      if (
+        /^\/event-thumbnails\/[a-z0-9-]+\/[A-Za-z0-9._/-]+\.(?:avif|gif|jpe?g|png|webp)$/i.test(
+          value,
+        ) &&
+        !value.split('/').includes('..')
+      ) {
+        return true;
+      }
+      try {
+        const url = new URL(value);
+        return url.protocol === 'https:' && !url.username && !url.password;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Use an HTTPS URL or a public /event-thumbnails event path' },
+  );
+
+const latitudeSchema = z.number().finite().min(-90).max(90).nullable();
+const longitudeSchema = z.number().finite().min(-180).max(180).nullable();
+
 export const localizedEventContentSchema = z.object({
   title: z.string().trim().min(1).max(180),
   celebrantName: z.string().trim().min(1).max(120),
   venueName: nullableText(200),
   hostMessage: nullableText(4000),
   arrivalInstructions: nullableText(2000),
+  parkingInstructions: nullableText(2000),
   thumbnailAltText: z.string().trim().min(1).max(240),
 });
 
@@ -120,6 +155,12 @@ export const hostEventSummarySchema = z.object({
   templateKey: eventTemplateKeySchema,
   primaryHostname: z.string().nullable(),
   thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+  formattedAddress: z.string().max(1000).nullable(),
+  readiness: z.object({
+    locationComplete: z.boolean(),
+    scheduleComplete: z.boolean(),
+    thumbnailConfigured: z.boolean(),
+  }),
   statistics: hostEventStatisticsSchema,
 });
 
@@ -134,7 +175,11 @@ export const hostEventDetailSchema = hostEventSummarySchema.extend({
   region: z.string().nullable(),
   postalCode: z.string().nullable(),
   countryCode: z.string().length(2).nullable(),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
   mapsUrl: nullableUrl,
+  publicThumbnailRef: publicEventThumbnailReferenceSchema.nullable(),
+  rsvpDeadline: z.iso.datetime().nullable(),
   thumbnailImageRef: eventMediaReferenceSchema.nullable(),
   staticBackgroundRef: eventMediaReferenceSchema.nullable(),
   localizedContent: eventContentByLocaleSchema,
@@ -169,9 +214,13 @@ export const updateHostEventInputSchema = z
     region: nullableText(120),
     postalCode: nullableText(32),
     countryCode: z.string().trim().toUpperCase().length(2).nullable(),
+    latitude: latitudeSchema,
+    longitude: longitudeSchema,
     mapsUrl: nullableUrl,
     thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+    publicThumbnailRef: publicEventThumbnailReferenceSchema.nullable(),
     staticBackgroundRef: eventMediaReferenceSchema.nullable(),
+    rsvpDeadline: z.iso.datetime().nullable(),
     localizedContent: eventContentByLocaleSchema,
     template: eventTemplateConfigurationSchema,
   })
@@ -182,6 +231,20 @@ export const updateHostEventInputSchema = z
         code: 'custom',
         path: ['endsAt'],
         message: 'End date and time must be after the start date and time',
+      });
+    }
+    if ((value.latitude === null) !== (value.longitude === null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['latitude'],
+        message: 'Latitude and longitude must be provided together',
+      });
+    }
+    if (value.rsvpDeadline && new Date(value.rsvpDeadline) > new Date(value.startsAt)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['rsvpDeadline'],
+        message: 'RSVP deadline must not be after the event starts',
       });
     }
     if (value.template.animationEnabled && value.template.animationMode === 'NONE') {

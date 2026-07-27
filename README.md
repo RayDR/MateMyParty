@@ -1,6 +1,6 @@
 # MateMyParty
 
-MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone adds secure RSVP responses, bounded attendance, dietary notes, guest messages, immutable response history, and operational host totals while preserving the privacy-safe themed invitation and lookup flows.
+MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone adds private event details, safe maps actions, Google/Outlook/Apple calendar flows, standards-compliant ICS downloads, a localized countdown, public social thumbnails, and host sharing previews while preserving RSVP and the privacy-safe invitation lookup.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ pnpm dev
 
 Open `http://localhost:3000` for the product landing and `http://localhost:3000/events/raymundo-6` for the seeded event. The API is at `http://localhost:3001`; health is `GET /health`.
 
-The public event route exposes promotional content only. Use the lookup form with a registered display name plus the complete email or phone; successful verification stores a 12-minute HttpOnly access grant and continues to `/invitation`. Existing permanent links remain available at `/i/{token}`. Both private experiences can create, update, and cancel RSVP responses. Neither private route is cached or indexed.
+The public event route exposes promotional content only. Use the lookup form with a registered display name plus the complete email or phone; successful verification stores a 12-minute HttpOnly access grant and continues to `/invitation`. Existing permanent links remain available at `/i/{token}`. Both private experiences can create, update, and cancel RSVP responses, open encoded Google/Apple Maps links, use Google/Outlook calendar links, and download an Apple-compatible ICS file. Neither private route is cached or indexed. If no event end is stored, calendar-provider links use a 120-minute display fallback; ICS and database data do not invent an end time.
 
 The temporary host panel for the seeded event uses its public slug (the random public code also works):
 
@@ -75,7 +75,7 @@ For a browser, add `127.0.0.1 raymundo6th.domoforge.com matemyparty.domoforge.co
 
 ## Database workflow
 
-`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, `0005_freezing_romulus.sql` for current RSVP state plus immutable history, and `0006_smiling_sage.sql` for the current-response update-time index. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
+`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, `0005_freezing_romulus.sql` for current RSVP state plus immutable history, `0006_smiling_sage.sql` for the current-response update-time index, and `0007_cool_gideon.sql` for nullable coordinates, parking copy, a separated public social thumbnail, and related constraints. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
 
 Optional non-personal sample guests are inserted only when explicitly requested:
 
@@ -83,7 +83,7 @@ Optional non-personal sample guests are inserted only when explicitly requested:
 SEED_SAMPLE_GUESTS=true pnpm db:seed
 ```
 
-Address fields and `endsAt` are nullable because those facts are not yet known. No fabricated values are seeded.
+Address, coordinates, parking details, social thumbnail, and `endsAt` remain nullable because unknown facts are not invented. No fabricated values are seeded.
 
 ## Guest and invitation API flow
 
@@ -139,7 +139,7 @@ pnpm docker:down
 
 ## Tests
 
-Contracts and frontend components use Vitest. The Nest API uses Jest. Run all suites with `pnpm test`; coverage includes public DTO privacy, RSVP states and attendance bounds, history/idempotence, cancellation, CSRF and body limits, token/grant access, rate limiting, host totals/detail, exact lookup normalization, open tracking, locale priority, media fallbacks, presentation modes, and protected preview.
+Contracts and frontend components use Vitest. The Nest API uses Jest. Run all suites with `pnpm test`; coverage includes public DTO privacy, RSVP states and attendance bounds, token/grant access, maps URL encoding and fallback, ICS escaping/CRLF/UID/privacy, calendar access, countdown states, safe metadata, SMS previews, locale priority, media fallbacks, presentation modes, and protected preview.
 
 See [docs/security.md](docs/security.md) before exposing any environment publicly.
 

@@ -9,6 +9,8 @@ Event thumbnail, background, video, fallback, and audio fields accept either:
 - an HTTPS URL; or
 - a protected path below `/private-media/<public-slug>/`.
 
+The social-sharing thumbnail is deliberately a different field. It accepts either an HTTPS URL or `/event-thumbnails/<public-slug>/...`. Local files for that route live in `/forge/matemyparty-public-thumbnails/` and Nginx serves them publicly for social crawlers. Never copy protected video, audio, private documents, or invitation-specific media into that directory.
+
 Raymundo's existing media uses:
 
 ```text
