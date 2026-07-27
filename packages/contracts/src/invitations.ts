@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { eventMediaReferenceSchema, publicEventSchema } from './events.js';
+import {
+  eventMediaReferenceSchema,
+  publicEventSchema,
+  publicEventThumbnailReferenceSchema,
+} from './events.js';
+import { calendarEventSchema, mapLinksSchema } from './event-tools.js';
 import { hostRsvpSummarySchema, publicRsvpResponseSchema } from './rsvp.js';
 
 export const supportedLocaleSchema = z.enum(['en-US', 'es-MX']);
@@ -144,12 +149,17 @@ export const guestInvitationStatisticsSchema = z.object({
 });
 
 export const invitationSharePreviewSchema = z.object({
-  eventTitle: z.string().min(1),
-  invitationText: z.string().min(1),
-  smsText: z.string().min(1),
+  eventTitle: z.string().min(1).max(180),
+  invitationText: z.string().min(1).max(600),
+  smsText: z.string().min(1).max(480),
+  smsCharacterCount: z.number().int().nonnegative(),
   hostname: z.string().nullable(),
-  thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+  publicUrlTemplate: z.string().min(1),
+  publicThumbnailRef: publicEventThumbnailReferenceSchema.nullable(),
   thumbnailAltText: z.string().min(1),
+  whatsAppApproximation: z.literal(true),
+  maps: mapLinksSchema.nullable(),
+  calendar: calendarEventSchema,
   locale: supportedLocaleSchema,
 });
 

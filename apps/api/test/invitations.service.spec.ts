@@ -55,6 +55,8 @@ const event: EventRow = {
   region: null,
   postalCode: null,
   countryCode: null,
+  latitude: null,
+  longitude: null,
   publicSlug: 'raymundo-6',
   publicCode: 'SQ52LQE9',
   templateKey: 'kids-night-dragon',
@@ -67,6 +69,7 @@ const event: EventRow = {
   audioEnabled: true,
   overlayIntensity: 50,
   thumbnailImageRef: null,
+  publicThumbnailRef: null,
   staticBackgroundRef: null,
   mapsUrl: null,
   hostMessage: null,
@@ -84,6 +87,7 @@ const localizations: LocalizationRow[] = [
     venueName: 'Celebration Center',
     hostMessage: null,
     arrivalInstructions: null,
+    parkingInstructions: null,
     thumbnailAltText: 'Birthday illustration',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -97,6 +101,7 @@ const localizations: LocalizationRow[] = [
     venueName: 'Centro de celebraciones',
     hostMessage: null,
     arrivalInstructions: null,
+    parkingInstructions: null,
     thumbnailAltText: 'Ilustración de cumpleaños',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -261,6 +266,11 @@ describe('InvitationsService lifecycle', () => {
     const first = await service.resolveAndTrack(created.token, {});
     const firstOpenedAt = repository.invitations[0]!.firstOpenedAt;
     expect(first.openedPreviously).toBe(false);
+    expect(first.tools.calendar.filename).toBe('matemyparty-raymundo-6.ics');
+    expect(first.tools.maps).toBeNull();
+    expect(JSON.stringify(first.tools.calendar)).not.toContain(created.token);
+    expect(JSON.stringify(first.tools.calendar)).not.toContain(guest.displayName);
+    expect(JSON.stringify(first.tools.calendar)).not.toContain('@example.test');
     const second = await service.resolveAndTrack(created.token, {});
     expect(second.openedPreviously).toBe(true);
     expect(repository.invitations[0]!.firstOpenedAt).toEqual(firstOpenedAt);

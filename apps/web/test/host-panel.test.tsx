@@ -42,9 +42,28 @@ function mockRequests(currentGuest: HostGuest = guest) {
         eventTitle: 'Raymundo’s 6th Birthday',
         invitationText: 'You are invited to Raymundo’s 6th Birthday.',
         smsText: "You're invited! /i/…",
+        smsCharacterCount: 23,
         hostname: 'raymundo6th.domoforge.com',
-        thumbnailImageRef: null,
+        publicUrlTemplate: 'https://raymundo6th.domoforge.com/i/…',
+        publicThumbnailRef: '/event-thumbnails/raymundo-6/share.webp',
         thumbnailAltText: 'Birthday thumbnail',
+        whatsAppApproximation: true,
+        maps: null,
+        calendar: {
+          title: 'Raymundo’s 6th Birthday',
+          startsAt: '2026-08-06T18:00:00.000Z',
+          endsAt: null,
+          timezone: 'America/Chicago',
+          location: 'Celebration Center, Dallas',
+          description: null,
+          arrivalInstructions: null,
+          invitationUrl: 'https://raymundo6th.domoforge.com/',
+          googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+          outlookCalendarUrl: 'https://outlook.live.com/calendar/0/deeplink/compose',
+          icsDownloadUrl: '/internal/calendar/ics',
+          filename: 'matemyparty-raymundo-6.ics',
+          locale: 'en-US',
+        },
         locale: 'en-US',
       });
     if (url.includes('/guest-statistics'))
@@ -197,5 +216,20 @@ describe('host guest management screen', () => {
     expect(screen.getAllByRole('heading', { name: 'Family Sample' }).length).toBeGreaterThan(0);
     await userEvent.selectOptions(screen.getByLabelText('Filter guests'), 'guestMessage');
     expect(screen.getAllByRole('heading', { name: 'Family Sample' }).length).toBeGreaterThan(0);
+  });
+
+  it('shows localized sharing, social, SMS, and calendar previews without claiming delivery', async () => {
+    mockRequests();
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+    await screen.findByRole('heading', { name: 'Family Sample' });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
+    expect(
+      await screen.findByRole('dialog', { name: 'Invitation sharing preview' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Approximation only/)).toBeInTheDocument();
+    expect(screen.getByText('SMS preview')).toBeInTheDocument();
+    expect(screen.getByText(/characters/)).toBeInTheDocument();
+    expect(screen.getByText('Calendar preview')).toBeInTheDocument();
+    expect(screen.getByText(/no message has been sent/i)).toBeInTheDocument();
   });
 });

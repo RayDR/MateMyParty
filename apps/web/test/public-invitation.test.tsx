@@ -9,6 +9,15 @@ describe('/i/[token] content', () => {
     expect(screen.getByText('This invitation was prepared for Family Sample.')).toBeInTheDocument();
     expect(screen.getByText(/1:00 PM/)).toBeInTheDocument();
     expect(screen.getByText(/123 Celebration Lane/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Google Maps' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('google.com/maps'),
+    );
+    expect(screen.getByRole('link', { name: 'Apple Maps' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('maps.apple.com'),
+    );
+    expect(screen.getByText('Use the east parking lot.')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('@');
   });
 
@@ -65,7 +74,11 @@ describe('/i/[token] content', () => {
     );
     expect(await screen.findByText('3 people confirmed')).toBeInTheDocument();
     expect(screen.getByText(/See you there/)).toBeInTheDocument();
-    expect(screen.getByText(/Add-to-calendar options/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add to calendar' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Google Calendar' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('calendar.google.com'),
+    );
     fetchMock.mockRestore();
   });
 

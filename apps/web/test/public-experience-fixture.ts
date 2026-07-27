@@ -46,6 +46,8 @@ export const privateInvitation = privateInvitationSchema.parse({
     region: 'Texas',
     postalCode: '75201',
     countryCode: 'US',
+    latitude: null,
+    longitude: null,
     mapsUrl: 'https://maps.example.test/celebration',
     rsvpDeadline: null,
     localizedContent: {
@@ -55,6 +57,7 @@ export const privateInvitation = privateInvitationSchema.parse({
         venueName: 'Celebration Center',
         hostMessage: 'We cannot wait to celebrate with you.',
         arrivalInstructions: 'Please arrive ten minutes early.',
+        parkingInstructions: 'Use the east parking lot.',
         thumbnailAltText: 'Night-sky birthday illustration',
       },
       'es-MX': {
@@ -63,6 +66,7 @@ export const privateInvitation = privateInvitationSchema.parse({
         venueName: 'Centro de celebraciones',
         hostMessage: 'Nos encantará celebrar contigo.',
         arrivalInstructions: 'Llega diez minutos antes.',
+        parkingInstructions: 'Usa el estacionamiento del lado este.',
         thumbnailAltText: 'Ilustración nocturna de cumpleaños',
       },
     },
@@ -78,12 +82,38 @@ export const privateInvitation = privateInvitationSchema.parse({
   invitationLocale: 'en-US',
   openedPreviously: false,
   rsvp: null,
+  tools: {
+    maps: {
+      formattedAddress: '123 Celebration Lane, Dallas, Texas, 75201, US',
+      googleMapsUrl:
+        'https://www.google.com/maps/search/?api=1&query=123+Celebration+Lane%2C+Dallas%2C+Texas%2C+75201%2C+US',
+      appleMapsUrl:
+        'https://maps.apple.com/?q=123+Celebration+Lane%2C+Dallas%2C+Texas%2C+75201%2C+US',
+      configuredMapsUrl: 'https://maps.example.test/celebration',
+      usesCoordinates: false,
+    },
+    calendar: {
+      title: 'Raymundo’s 6th Birthday',
+      startsAt: '2026-08-06T18:00:00.000Z',
+      endsAt: null,
+      timezone: 'America/Chicago',
+      location: 'Celebration Center, 123 Celebration Lane, Dallas, Texas, 75201, US',
+      description: 'We cannot wait to celebrate with you.',
+      arrivalInstructions: 'Please arrive ten minutes early.',
+      invitationUrl: 'https://raymundo6th.domoforge.com/',
+      googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+      outlookCalendarUrl: 'https://outlook.live.com/calendar/0/deeplink/compose?rru=addevent',
+      icsDownloadUrl: '/internal/calendar/ics',
+      filename: 'matemyparty-raymundo-6.ics',
+      locale: 'en-US',
+    },
+  },
   shareMetadata: {
     title: 'Raymundo’s 6th Birthday',
     description: 'You are invited to Raymundo’s 6th Birthday.',
     hostname: 'raymundo6th.domoforge.com',
-    thumbnailImageRef: '/private-media/raymundo-6/thumbnail.webp',
+    thumbnailImageRef: '/event-thumbnails/raymundo-6/thumbnail.webp',
     thumbnailAltText: 'Night-sky birthday illustration',
   },
-  capabilities: { canRespond: true, canAddToCalendar: false },
+  capabilities: { canRespond: true, canAddToCalendar: true },
 });

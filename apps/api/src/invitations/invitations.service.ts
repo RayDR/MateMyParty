@@ -116,7 +116,9 @@ export class InvitationsService {
         this.tokens.matches(candidate.publicTokenHash, expectedHash),
       );
       if (!invitation || invitation.revokedAt) throw this.publicNotFound();
-      return this.renderAndTrack(invitation, metadata, executor);
+      const details = await this.repository.publicDetails(invitation.id, executor);
+      if (!details) throw this.publicNotFound();
+      return this.renderAndTrack(invitation, metadata, executor, details);
     });
   }
 
@@ -140,7 +142,9 @@ export class InvitationsService {
       if (!(await this.repository.markAccessGrantUsed(candidate.grant.id, now, executor))) {
         throw this.publicNotFound();
       }
-      return this.renderAndTrack(candidate.invitation, metadata, executor);
+      const details = await this.repository.publicDetails(candidate.invitation.id, executor);
+      if (!details) throw this.publicNotFound();
+      return this.renderAndTrack(candidate.invitation, metadata, executor, details);
     });
   }
 
@@ -185,9 +189,11 @@ export class InvitationsService {
     invitation: Awaited<ReturnType<InvitationsRepository['findById']>> & object,
     metadata: Record<string, string>,
     executor: DatabaseExecutor,
+    resolvedDetails?: NonNullable<Awaited<ReturnType<InvitationsRepository['publicDetails']>>>,
   ) {
     const openedPreviously = invitation.openCount > 0;
-    const details = await this.repository.publicDetails(invitation.id, executor);
+    const details =
+      resolvedDetails ?? (await this.repository.publicDetails(invitation.id, executor));
     if (!details) throw this.publicNotFound();
     const now = new Date();
     const opened = await this.repository.recordOpen(invitation.id, now, executor);

@@ -20,9 +20,13 @@ const validUpdate = {
   region: null,
   postalCode: null,
   countryCode: null,
+  latitude: null,
+  longitude: null,
   mapsUrl: null,
   thumbnailImageRef: null,
+  publicThumbnailRef: null,
   staticBackgroundRef: null,
+  rsvpDeadline: null,
   localizedContent: {
     'en-US': {
       title: 'Raymundo’s 6th Birthday',
@@ -30,6 +34,7 @@ const validUpdate = {
       venueName: 'Kids Empire Dallas Hillcrest',
       hostMessage: null,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: 'Raymundo’s 6th birthday',
     },
     'es-MX': {
@@ -38,6 +43,7 @@ const validUpdate = {
       venueName: 'Kids Empire Dallas Hillcrest',
       hostMessage: null,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: 'Sexto cumpleaños de Raymundo',
     },
   },
@@ -114,6 +120,26 @@ describe('event contracts', () => {
     ).toBe(false);
   });
 
+  it('requires valid coordinate pairs and validates the public thumbnail path', () => {
+    expect(updateHostEventInputSchema.safeParse({ ...validUpdate, latitude: 32.8 }).success).toBe(
+      false,
+    );
+    expect(
+      updateHostEventInputSchema.safeParse({
+        ...validUpdate,
+        latitude: 32.8,
+        longitude: -96.8,
+        publicThumbnailRef: '/event-thumbnails/raymundo-6/share.webp',
+      }).success,
+    ).toBe(true);
+    expect(
+      updateHostEventInputSchema.safeParse({
+        ...validUpdate,
+        publicThumbnailRef: '/private-media/raymundo-6/share.webp',
+      }).success,
+    ).toBe(false);
+  });
+
   it('requires both supported locales', () => {
     expect(
       updateHostEventInputSchema.safeParse({
@@ -137,6 +163,18 @@ describe('event contracts', () => {
       updateHostEventInputSchema.safeParse({
         ...validUpdate,
         thumbnailImageRef: '/private-media/raymundo-6/../secret',
+      }).success,
+    ).toBe(false);
+    expect(
+      updateHostEventInputSchema.safeParse({
+        ...validUpdate,
+        mapsUrl: 'https://user:password@maps.example.test/place',
+      }).success,
+    ).toBe(false);
+    expect(
+      updateHostEventInputSchema.safeParse({
+        ...validUpdate,
+        publicThumbnailRef: 'https://user:password@images.example.test/share.webp',
       }).success,
     ).toBe(false);
   });

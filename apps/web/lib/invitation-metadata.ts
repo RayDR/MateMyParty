@@ -16,6 +16,11 @@ export function invitationMetadata(
         title: neutralDictionary.invitation.pageTitle,
         description: neutralDictionary.common.platformName,
       },
+      twitter: {
+        card: 'summary',
+        title: neutralDictionary.invitation.pageTitle,
+        description: neutralDictionary.common.platformName,
+      },
     };
   }
   const content = invitation.event.localizedContent[locale];
@@ -27,21 +32,30 @@ export function invitationMetadata(
     invitation.shareMetadata.thumbnailImageRef,
     invitation.shareMetadata.hostname,
   );
+  const canonicalUrl = invitation.shareMetadata.hostname
+    ? `https://${invitation.shareMetadata.hostname}/`
+    : undefined;
+  const images = imageUrl
+    ? [{ url: imageUrl, width: 1200, height: 630, alt: content.thumbnailAltText }]
+    : undefined;
   return {
     title: content.title,
     description,
     robots: { index: false, follow: false, nocache: true },
+    alternates: canonicalUrl ? { canonical: canonicalUrl } : undefined,
     openGraph: {
+      type: 'website',
+      url: canonicalUrl,
+      siteName: neutralDictionary.common.platformName,
       title: content.title,
       description,
-      images: imageUrl
-        ? [
-            {
-              url: imageUrl,
-              alt: content.thumbnailAltText,
-            },
-          ]
-        : undefined,
+      images,
+    },
+    twitter: {
+      card: imageUrl ? 'summary_large_image' : 'summary',
+      title: content.title,
+      description,
+      images: imageUrl ? [{ url: imageUrl, alt: content.thumbnailAltText }] : undefined,
     },
   };
 }

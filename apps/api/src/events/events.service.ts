@@ -15,6 +15,7 @@ import {
 import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { ApiError, parseInput } from '../common/api-error';
 import { EventsRepository, type HostEventRecord } from './events.repository';
+import { buildCalendarEvent, buildMapLinks, formatAddress } from './event-tools';
 import { presentHostPresentationPreview, presentPublicLanding } from './presentation.presenter';
 
 @Injectable()
@@ -45,7 +46,9 @@ export class EventsService {
     identifier: string,
     requestedLocale?: string,
   ): Promise<InvitationSharePreview> {
-    const event = await this.hostEvent(identifier);
+    const record = await this.repository.findHostRecordByIdentifier(identifier);
+    if (!record) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
+    const event = this.toHostDetail(record);
     const locale: Locale =
       requestedLocale === 'en-US' || requestedLocale === 'es-MX'
         ? requestedLocale
@@ -53,16 +56,40 @@ export class EventsService {
     const content = event.localizedContent[locale];
     const dictionary = getDictionary(locale).invitation;
     const invitationText = dictionary.shareGeneric.replace('{eventTitle}', content.title);
-    const invitationUrl = event.primaryHostname ? `https://${event.primaryHostname}/i/…` : '/i/…';
+    const invitationUrl = event.primaryHostname
+      ? `https://${event.primaryHostname}/i/…`
+      : 'https://matemyparty.domoforge.com/i/…';
+    const calendarUrl = event.primaryHostname
+      ? `https://${event.primaryHostname}/`
+      : 'https://matemyparty.domoforge.com/';
+    const deadline = event.rsvpDeadline
+      ? new Intl.DateTimeFormat(locale, {
+          dateStyle: 'medium',
+          timeZone: event.timezone,
+        }).format(new Date(event.rsvpDeadline))
+      : null;
+    const smsText = `${dictionary.shareSms
+      .replace('{eventTitle}', content.title)
+      .replace('{invitationUrl}', invitationUrl)}${
+      deadline ? ` ${dictionary.shareSmsDeadline.replace('{deadline}', deadline)}` : ''
+    }`;
     return invitationSharePreviewSchema.parse({
       eventTitle: content.title,
       invitationText,
-      smsText: dictionary.shareSms
-        .replace('{eventTitle}', content.title)
-        .replace('{invitationUrl}', invitationUrl),
+      smsText,
+      smsCharacterCount: Array.from(smsText).length,
       hostname: event.primaryHostname,
-      thumbnailImageRef: event.thumbnailImageRef,
+      publicUrlTemplate: invitationUrl,
+      publicThumbnailRef: event.publicThumbnailRef,
       thumbnailAltText: content.thumbnailAltText,
+      whatsAppApproximation: true,
+      maps: buildMapLinks(record.event),
+      calendar: buildCalendarEvent(
+        record.event,
+        record.localizations.find((candidate) => candidate.locale === locale),
+        locale,
+        calendarUrl,
+      ),
       locale,
     });
   }
@@ -128,6 +155,15 @@ export class EventsService {
       templateKey: event.templateKey,
       primaryHostname: record.primaryHostname,
       thumbnailImageRef: event.thumbnailImageRef,
+      formattedAddress: formatAddress(event) || null,
+      readiness: {
+        locationComplete: Boolean(
+          (event.latitude !== null && event.longitude !== null) ||
+            (event.addressLine1 && event.city && event.countryCode),
+        ),
+        scheduleComplete: Boolean(event.startsAt && event.timezone),
+        thumbnailConfigured: Boolean(event.publicThumbnailRef),
+      },
       statistics: {
         ...record.statistics,
       },
@@ -148,7 +184,11 @@ export class EventsService {
       region: event.region,
       postalCode: event.postalCode,
       countryCode: event.countryCode,
+      latitude: event.latitude,
+      longitude: event.longitude,
       mapsUrl: event.mapsUrl,
+      publicThumbnailRef: event.publicThumbnailRef,
+      rsvpDeadline: event.rsvpDeadline?.toISOString() ?? null,
       staticBackgroundRef: event.staticBackgroundRef,
       localizedContent: this.localizedContent(record),
       template: {
@@ -173,6 +213,7 @@ export class EventsService {
       venueName: record.event.venueName,
       hostMessage: record.event.hostMessage,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: record.event.title,
     };
     const locale = (value: 'en-US' | 'es-MX') => {
@@ -184,6 +225,7 @@ export class EventsService {
             venueName: row.venueName,
             hostMessage: row.hostMessage,
             arrivalInstructions: row.arrivalInstructions,
+            parkingInstructions: row.parkingInstructions,
             thumbnailAltText: row.thumbnailAltText,
           }
         : fallback;
@@ -208,9 +250,13 @@ export class EventsService {
       region: detail.region,
       postalCode: detail.postalCode,
       countryCode: detail.countryCode,
+      latitude: detail.latitude,
+      longitude: detail.longitude,
       mapsUrl: detail.mapsUrl,
       thumbnailImageRef: detail.thumbnailImageRef,
+      publicThumbnailRef: detail.publicThumbnailRef,
       staticBackgroundRef: detail.staticBackgroundRef,
+      rsvpDeadline: detail.rsvpDeadline,
       localizedContent: detail.localizedContent,
       template: detail.template,
     };

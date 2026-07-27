@@ -24,6 +24,8 @@ const publicEventFields = {
   region: null,
   postalCode: null,
   countryCode: null,
+  latitude: null,
+  longitude: null,
   publicSlug: 'raymundo-6',
   templateKey: 'kids-night-dragon',
   templateVersion: 1,
@@ -44,6 +46,7 @@ const event: EventRow = {
   audioEnabled: true,
   overlayIntensity: 50,
   thumbnailImageRef: null,
+  publicThumbnailRef: null,
   staticBackgroundRef: null,
   mapsUrl: null,
   createdAt: new Date('2026-07-26T00:00:00.000Z'),
@@ -62,6 +65,7 @@ const localization = (locale: 'en-US' | 'es-MX', title: string): LocalizationRow
   venueName: 'Kids Empire Dallas Hillcrest',
   hostMessage: null,
   arrivalInstructions: null,
+  parkingInstructions: null,
   thumbnailAltText: title,
   createdAt: new Date('2026-07-26T00:00:00.000Z'),
   updatedAt: new Date('2026-07-26T00:00:00.000Z'),
@@ -113,9 +117,13 @@ const update: UpdateHostEventInput = {
   region: null,
   postalCode: null,
   countryCode: null,
+  latitude: null,
+  longitude: null,
   mapsUrl: null,
   thumbnailImageRef: null,
+  publicThumbnailRef: null,
   staticBackgroundRef: null,
+  rsvpDeadline: null,
   localizedContent: {
     'en-US': {
       title: 'Raymundo’s 6th Birthday',
@@ -123,6 +131,7 @@ const update: UpdateHostEventInput = {
       venueName: 'Kids Empire Dallas Hillcrest',
       hostMessage: null,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: 'Raymundo’s 6th birthday',
     },
     'es-MX': {
@@ -131,6 +140,7 @@ const update: UpdateHostEventInput = {
       venueName: 'Kids Empire Dallas Hillcrest',
       hostMessage: null,
       arrivalInstructions: null,
+      parkingInstructions: null,
       thumbnailAltText: 'Sexto cumpleaños de Raymundo',
     },
   },
@@ -205,8 +215,30 @@ describe('EventsService', () => {
       hostname: 'raymundo6th.domoforge.com',
     });
     expect(preview.smsText).toContain('https://raymundo6th.domoforge.com/i/…');
+    expect(preview.smsCharacterCount).toBe(Array.from(preview.smsText).length);
+    expect(preview.calendar.googleCalendarUrl).toContain('calendar.google.com');
+    expect(preview.whatsAppApproximation).toBe(true);
     expect(preview).not.toHaveProperty('guest');
     expect(preview).not.toHaveProperty('email');
+  });
+
+  it('adds a localized optional RSVP deadline while keeping SMS copy bounded', async () => {
+    const repository = {
+      findHostRecordByIdentifier: jest.fn().mockResolvedValue({
+        ...hostRecord,
+        event: {
+          ...hostRecord.event,
+          rsvpDeadline: new Date('2026-08-01T18:00:00.000Z'),
+        },
+      }),
+    } as unknown as EventsRepository;
+    const preview = await new EventsService(repository).invitationSharePreview(
+      'raymundo-6',
+      'es-MX',
+    );
+    expect(preview.smsText).toContain('Confirma tu asistencia antes del');
+    expect(preview.smsCharacterCount).toBeLessThanOrEqual(480);
+    expect(preview.smsText).not.toContain('Family Sample');
   });
 
   it('builds protected presentation preview without recording an invitation open', async () => {
