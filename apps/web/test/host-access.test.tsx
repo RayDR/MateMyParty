@@ -46,4 +46,23 @@ describe('temporary host access', () => {
     expect(cookie).not.toContain(token);
     expect(response.headers.get('location')).not.toContain('localhost');
   });
+
+  it('redirects invalid access attempts to the platform instead of an untrusted host', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const request = new NextRequest('http://localhost:3200/host/access', {
+      method: 'POST',
+      headers: {
+        host: 'localhost:3200',
+        'x-forwarded-host': 'attacker.example',
+        'x-forwarded-proto': 'https',
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body: 'token=invalid',
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(
+      'https://matemyparty.domoforge.com/host/access?accessError=1',
+    );
+  });
 });

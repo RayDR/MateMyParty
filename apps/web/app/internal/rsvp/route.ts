@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { INVITATION_ACCESS_COOKIE } from '../../../lib/invitation-access';
 import { internalApiBaseUrl } from '../../../lib/server-api';
+import { publicRequestOrigin } from '../../../lib/public-origin';
 
 const maximumBodyBytes = 8 * 1024;
 
@@ -56,7 +57,7 @@ function sameOrigin(request: NextRequest) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
   try {
-    return new URL(origin).origin === request.nextUrl.origin;
+    return new URL(origin).origin === publicRequestOrigin(request);
   } catch {
     return false;
   }

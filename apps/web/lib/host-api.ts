@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { validHostSession } from './host-session';
+import { publicRequestOrigin } from './public-origin';
 import { internalApiBaseUrl } from './server-api';
 
 export async function forwardHostRequest(
@@ -45,7 +46,7 @@ export function rejectInvalidHostMutation(request: NextRequest) {
   try {
     if (
       origin &&
-      new URL(origin).origin === request.nextUrl.origin &&
+      new URL(origin).origin === publicRequestOrigin(request) &&
       request.headers.get('x-mmp-csrf') === '1'
     ) {
       return null;
