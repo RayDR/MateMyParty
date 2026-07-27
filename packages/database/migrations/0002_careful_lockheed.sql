@@ -49,19 +49,19 @@ INSERT INTO "event_localizations" (
 	"thumbnail_alt_text"
 )
 SELECT
-	"id",
-	locale,
+	"events"."id",
+	supported_locales.locale,
 	CASE
-		WHEN lower("public_slug") = 'raymundo-6' AND locale = 'es-MX' THEN 'Sexto cumpleaños de Raymundo'
-		ELSE "title"
+		WHEN lower("events"."public_slug") = 'raymundo-6' AND supported_locales.locale = 'es-MX' THEN 'Sexto cumpleaños de Raymundo'
+		ELSE "events"."title"
 	END,
-	"celebrant_name",
-	"venue_name",
-	"host_message",
+	"events"."celebrant_name",
+	"events"."venue_name",
+	"events"."host_message",
 	NULL,
 	CASE
-		WHEN lower("public_slug") = 'raymundo-6' AND locale = 'es-MX' THEN 'Sexto cumpleaños de Raymundo'
-		ELSE "title"
+		WHEN lower("events"."public_slug") = 'raymundo-6' AND supported_locales.locale = 'es-MX' THEN 'Sexto cumpleaños de Raymundo'
+		ELSE "events"."title"
 	END
 FROM "events"
 CROSS JOIN (VALUES ('en-US'), ('es-MX')) AS supported_locales(locale);--> statement-breakpoint
