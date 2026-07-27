@@ -32,6 +32,42 @@ body {
   background: linear-gradient(135deg, rgb(255 255 255 / 9%), transparent 34%);
 }
 
+.invitation-envelope-button {
+  animation: invitation-envelope-pulse 2.8s ease-in-out infinite;
+}
+
+.invitation-envelope-button:hover {
+  background-color: rgb(251 191 36 / 18%);
+}
+
+.invitation-envelope-closed,
+.invitation-envelope-open {
+  transform-origin: center top;
+}
+
+.invitation-envelope-closed {
+  animation: invitation-envelope-close-cycle 2.8s ease-in-out infinite;
+}
+
+.invitation-envelope-open {
+  animation: invitation-envelope-open-cycle 2.8s ease-in-out infinite;
+}
+
+.invitation-envelope-opened {
+  animation: invitation-envelope-settle 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-summary {
+  animation: invitation-summary-reveal 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-summary-copy {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .invitation-back {
   animation-name: invitation-card-rise;
 }
@@ -97,6 +133,22 @@ body {
   display: none;
 }
 
+[data-reduced-motion='true'] .invitation-envelope-button,
+[data-reduced-motion='true'] .invitation-envelope-closed,
+[data-reduced-motion='true'] .invitation-envelope-open,
+[data-reduced-motion='true'] .invitation-envelope-opened,
+[data-reduced-motion='true'] .invitation-summary {
+  animation: none;
+}
+
+[data-reduced-motion='true'] .invitation-envelope-closed {
+  opacity: 1;
+}
+
+[data-reduced-motion='true'] .invitation-envelope-open {
+  opacity: 0;
+}
+
 .invitation-section[open] .invitation-chevron {
   transform: rotate(180deg);
 }
@@ -142,6 +194,68 @@ body {
   from {
     opacity: 0;
     transform: translateY(1rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invitation-envelope-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0.75rem 2rem rgb(2 6 23 / 45%);
+  }
+  50% {
+    box-shadow:
+      0 0.75rem 2rem rgb(2 6 23 / 45%),
+      0 0 0 0.35rem rgb(253 230 138 / 10%);
+  }
+}
+
+@keyframes invitation-envelope-close-cycle {
+  0%,
+  30%,
+  100% {
+    opacity: 1;
+    transform: perspective(12rem) rotateX(0) scale(1);
+  }
+  43%,
+  76% {
+    opacity: 0;
+    transform: perspective(12rem) rotateX(34deg) scale(0.94);
+  }
+}
+
+@keyframes invitation-envelope-open-cycle {
+  0%,
+  30%,
+  100% {
+    opacity: 0;
+    transform: translateY(0.15rem) scale(0.94);
+  }
+  43%,
+  76% {
+    opacity: 1;
+    transform: translateY(-0.05rem) scale(1);
+  }
+}
+
+@keyframes invitation-envelope-settle {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invitation-summary-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem) scale(0.985);
   }
   to {
     opacity: 1;
@@ -338,11 +452,24 @@ body {
 
   .invitation-front,
   .invitation-back,
-  .invitation-opening-envelope_reveal::before {
+  .invitation-opening-envelope_reveal::before,
+  .invitation-envelope-button,
+  .invitation-envelope-closed,
+  .invitation-envelope-open,
+  .invitation-envelope-opened,
+  .invitation-summary {
     animation: none;
   }
 
   .invitation-opening-envelope_reveal::before {
     display: none;
+  }
+
+  .invitation-envelope-closed {
+    opacity: 1;
+  }
+
+  .invitation-envelope-open {
+    opacity: 0;
   }
 }

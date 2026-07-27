@@ -11,6 +11,15 @@ function mockAudioPlay(result: 'success' | 'failure' = 'success') {
     );
 }
 
+function openSummary(label = 'Open invitation') {
+  fireEvent.click(screen.getByRole('button', { name: label }));
+}
+
+function openFullInvitation(label = 'Open invitation') {
+  openSummary(label);
+  fireEvent.click(screen.getByRole('button', { name: label }));
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('/i/[token] content', () => {
@@ -27,9 +36,18 @@ describe('/i/[token] content', () => {
     );
     expect(within(front as HTMLElement).getByRole('heading', { name: 'Raymundo' })).toBeVisible();
     expect(within(front as HTMLElement).getByText('Turning 6')).toBeVisible();
-    expect(
-      within(front as HTMLElement).getByRole('button', { name: 'Open invitation' }),
-    ).toBeVisible();
+    const envelope = within(front as HTMLElement).getByRole('button', {
+      name: 'Open invitation',
+    });
+    expect(envelope).toBeVisible();
+    expect(envelope).toHaveAttribute('type', 'button');
+    expect(envelope).toHaveAttribute('title', 'Open invitation');
+    expect(envelope).toHaveClass('invitation-envelope-button');
+    expect(front?.querySelector('.invitation-envelope-closed')).toBeInTheDocument();
+    expect(front?.querySelector('.invitation-envelope-open')).toBeInTheDocument();
+    expect(front?.querySelector('.absolute.inset-0')).toHaveClass('justify-center');
+    expect(front?.querySelector('.absolute.inset-0')).not.toHaveClass('justify-end');
+    expect(within(front as HTMLElement).getByText('Open invitation')).toBeVisible();
     expect(screen.queryByText('Family Sample')).not.toBeInTheDocument();
     expect(screen.queryByText(/1:00 PM/)).not.toBeInTheDocument();
     expect(screen.queryByText(/123 Celebration Lane/)).not.toBeInTheDocument();
@@ -37,12 +55,31 @@ describe('/i/[token] content', () => {
     expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).not.toBeInTheDocument();
   });
 
-  it('unlocks audio with the opening gesture and reveals compact essential details', () => {
+  it('unlocks audio with the first gesture and reveals only the private summary', () => {
+    const play = mockAudioPlay();
+    render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
+    openSummary();
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("You're invited")).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Family Sample' })).toBeVisible();
+    expect(screen.getByText('We cannot wait to celebrate with you.')).toBeInTheDocument();
+    expect(screen.getByText('Please arrive ten minutes early.')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Raymundo’s 6th Birthday' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('When')).not.toBeInTheDocument();
+    expect(screen.queryByText(/1:00 PM/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/123 Celebration Lane/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open invitation' })).toBeVisible();
+  });
+
+  it('reveals compact essential details on the second action without restarting music', () => {
     const play = mockAudioPlay();
     const { container } = render(
       <PublicInvitation invitation={privateInvitation} initialLocale="en-US" />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openFullInvitation();
     expect(play).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Raymundo’s 6th Birthday' })).toBeVisible();
     expect(screen.getByText('When')).toBeVisible();
@@ -92,9 +129,12 @@ describe('/i/[token] content', () => {
   it('opens even when autoplay is rejected', () => {
     const play = mockAudioPlay('failure');
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openSummary();
     expect(play).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('heading', { name: 'Raymundo’s 6th Birthday' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Family Sample' })).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { name: 'Raymundo’s 6th Birthday' }),
+    ).not.toBeInTheDocument();
   });
 
   it('removes complex opening decoration when reduced motion is requested', () => {
@@ -102,15 +142,17 @@ describe('/i/[token] content', () => {
     const { container } = render(
       <PublicInvitation invitation={privateInvitation} initialLocale="en-US" reducedMotion />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openSummary();
     expect(container.querySelector('[data-reduced-motion="true"]')).toBeInTheDocument();
     expect(container.querySelector('.celebration-flight')).not.toBeInTheDocument();
+    expect(container.querySelector('.invitation-envelope-opened')).toBeInTheDocument();
+    expect(container.querySelector('[data-invitation-phase="summary"]')).toBeInTheDocument();
   });
 
   it('uses one compact calendar control and keeps existing providers', () => {
     mockAudioPlay();
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openFullInvitation();
     expect(screen.getByLabelText('Add to calendar')).toHaveAttribute('title', 'Add to calendar');
     expect(screen.getByRole('link', { name: 'Google Calendar' })).toHaveAttribute(
       'href',
@@ -130,13 +172,17 @@ describe('/i/[token] content', () => {
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'es-MX' } });
     expect(screen.getByText('Cumple 6')).toBeVisible();
+    openSummary('Abrir invitación');
+    expect(screen.getByText('Estás invitado')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Family Sample' })).toBeVisible();
+    expect(screen.getByText('Nos encantará celebrar contigo.')).toBeInTheDocument();
+    expect(screen.queryByText('We cannot wait to celebrate with you.')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir invitación' }));
     expect(screen.getByRole('heading', { name: 'Sexto cumpleaños de Raymundo' })).toBeVisible();
     expect(screen.getByText('Cuándo')).toBeVisible();
     expect(screen.getByText('Dónde')).toBeVisible();
     expect(screen.getByText('Grupo invitado')).toBeVisible();
     expect(screen.getByText('Nos encantará celebrar contigo.')).toBeInTheDocument();
-    expect(screen.queryByText('We cannot wait to celebrate with you.')).not.toBeInTheDocument();
   });
 
   it('renders a neutral invalid invitation state', () => {
@@ -167,7 +213,7 @@ describe('/i/[token] content', () => {
         accessToken={'A'.repeat(43)}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openFullInvitation();
     fireEvent.click(screen.getByRole('button', { name: "Yes, we'll be there" }));
     fireEvent.change(screen.getByLabelText('Children attending'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Message for the host (optional)'), {
@@ -193,7 +239,7 @@ describe('/i/[token] content', () => {
     mockAudioPlay();
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" preview />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openFullInvitation();
     expect(screen.getByRole('button', { name: "Yes, we'll be there" })).toBeDisabled();
     expect(screen.getByRole('button', { name: "No, we can't attend" })).toBeDisabled();
     expect(screen.getByRole('button', { name: "We're not sure yet" })).toBeDisabled();
@@ -239,7 +285,7 @@ describe('/i/[token] content', () => {
         accessToken={'A'.repeat(43)}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openFullInvitation();
     fireEvent.click(screen.getByRole('button', { name: "No, we can't attend" }));
     fireEvent.click(screen.getByRole('button', { name: 'Save RSVP' }));
     expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
@@ -257,7 +303,7 @@ describe('/i/[token] content', () => {
         accessToken={'A'.repeat(43)}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    openFullInvitation();
     fireEvent.click(screen.getByRole('button', { name: 'Update response' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel attendance' }));
     expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
