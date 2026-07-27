@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { normalizeHostname } from '@matemyparty/contracts';
+import { isAllowedProductionHostname, platformPublicUrl } from './lib/public-origin';
 
 export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname === '/host/access' && request.method === 'POST') {
@@ -21,6 +22,9 @@ export function proxy(request: NextRequest) {
   );
   const local = hostname === 'localhost' || hostname === '127.0.0.1';
   if (!hostname || local || hostname === primary) return NextResponse.next();
+  if (process.env.NODE_ENV === 'production' && !isAllowedProductionHostname(hostname)) {
+    return NextResponse.redirect(platformPublicUrl(request.nextUrl.pathname));
+  }
   const url = request.nextUrl.clone();
   // The public request may be HTTPS, but this rewrite is handled by the local HTTP Next server.
   url.protocol = 'http:';

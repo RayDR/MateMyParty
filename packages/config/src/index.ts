@@ -18,6 +18,7 @@ export const environmentSchema = z
     DEFAULT_LOCALE: z.enum(['en-US', 'es-MX']).default('en-US'),
     SUPPORTED_LOCALES: z.string().default('en-US,es-MX'),
     PRIMARY_APP_HOSTNAME: z.string().default('matemyparty.domoforge.com'),
+    PUBLIC_APP_HOSTNAMES: z.string().default('matemyparty.domoforge.com,raymundo6th.domoforge.com'),
     HOST_ADMIN_TOKEN: z.string().optional(),
     PUBLIC_APP_PROTOCOL: z.enum(['http', 'https']).default('http'),
     SEED_SAMPLE_GUESTS: z.enum(['true', 'false']).default('false'),

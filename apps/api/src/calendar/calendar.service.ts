@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Locale } from '@matemyparty/i18n';
 import { ApiError } from '../common/api-error';
+import { publicEventUrl } from '../common/public-url';
 import {
   buildCalendarEvent,
   buildHostCalendarPreview,
@@ -99,10 +100,7 @@ export class CalendarService {
 }
 
 function invitationUrl(hostname: string | null): string {
-  const protocol =
-    process.env.PUBLIC_APP_PROTOCOL ?? (process.env.NODE_ENV === 'production' ? 'https' : 'http');
-  const host = hostname ?? process.env.PRIMARY_APP_HOSTNAME ?? 'localhost:3000';
-  return `${protocol}://${host}/`;
+  return publicEventUrl('/', hostname);
 }
 
 function normalizeLocale(value: string): Locale {

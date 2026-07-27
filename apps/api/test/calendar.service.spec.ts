@@ -57,6 +57,8 @@ describe('private calendar access', () => {
   });
 
   it('builds the protected host preview without resolving or opening an invitation', async () => {
+    const previousEnvironment = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
     const resolveAccess = jest.fn();
     const recordOpen = jest.fn();
     const record = {
@@ -95,7 +97,13 @@ describe('private calendar access', () => {
     expect(preview.stableUid).toBe('SQ52LQE9@calendar.matemyparty.domoforge.com');
     expect(preview.providerFallbackMinutes).toBe(120);
     expect(preview.maps?.googleMapsUrl).toContain('google.com/maps');
+    expect(preview.event.invitationUrl).toBe('https://raymundo6th.domoforge.com/');
+    expect(preview.event.googleCalendarUrl).toContain(
+      encodeURIComponent('https://raymundo6th.domoforge.com/'),
+    );
     expect(resolveAccess).not.toHaveBeenCalled();
     expect(recordOpen).not.toHaveBeenCalled();
+    if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnvironment;
   });
 });

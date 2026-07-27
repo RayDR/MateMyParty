@@ -16,6 +16,24 @@ const response = {
 };
 
 describe('RSVP web boundary', () => {
+  it('accepts the public event origin forwarded to the loopback listener', async () => {
+    const upstream = vi.fn().mockResolvedValue(Response.json(response));
+    vi.stubGlobal('fetch', upstream);
+    const request = new NextRequest('http://127.0.0.1:3200/internal/rsvp', {
+      method: 'POST',
+      headers: {
+        host: '127.0.0.1:3200',
+        'x-forwarded-host': 'raymundo6th.domoforge.com',
+        'x-forwarded-proto': 'https',
+        origin: 'https://raymundo6th.domoforge.com',
+        'x-mmp-csrf': '1',
+        'x-invitation-token': 'A'.repeat(43),
+      },
+      body: '{}',
+    });
+    expect((await POST(request)).status).toBe(200);
+  });
+
   it('forwards a permanent credential in a header and never in the URL', async () => {
     const upstream = vi.fn().mockResolvedValue(Response.json(response));
     vi.stubGlobal('fetch', upstream);
