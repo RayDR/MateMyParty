@@ -16,6 +16,7 @@ import {
   Copy,
   Download,
   HelpCircle,
+  Mail,
   MailOpen,
   MapPin,
   Pencil,
@@ -42,9 +43,10 @@ export function PublicInvitation({
   accessToken?: string;
 }) {
   const [locale, setLocale] = useState(initialLocale);
-  const [opened, setOpened] = useState(false);
+  const [phase, setPhase] = useState<'closed' | 'summary' | 'full'>('closed');
   const [calendar, setCalendar] = useState<CalendarEvent>(invitation.tools.calendar);
   const media = useRef<InvitationMediaHandle>(null);
+  const summary = useRef<HTMLElement>(null);
   const dictionary = getDictionary(locale);
   const { event } = invitation;
   const content = event.localizedContent[locale];
@@ -61,6 +63,10 @@ export function PublicInvitation({
     content.parkingInstructions,
     fallbackContent.parkingInstructions,
   );
+  const summaryInstructions = arrivalInstructions ?? parkingInstructions;
+  const summaryInstructionsTitle = arrivalInstructions
+    ? dictionary.invitation.arrivalInstructions
+    : dictionary.invitation.parkingInstructions;
   const startsAt = new Date(event.startsAt);
   const dateTime = new Intl.DateTimeFormat(locale, {
     dateStyle: 'full',
@@ -103,6 +109,20 @@ export function PublicInvitation({
       });
     return () => controller.abort();
   }, [accessToken, locale, preview]);
+  useEffect(() => {
+    if (phase !== 'summary') return;
+    const frame = window.requestAnimationFrame(() => {
+      const shouldReduce =
+        reducedMotion ||
+        (typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      summary.current?.scrollIntoView?.({
+        behavior: shouldReduce ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [phase, reducedMotion]);
   return (
     <ThemedInvitationStage
       ref={media}
@@ -112,12 +132,14 @@ export function PublicInvitation({
       mediaDisabled={mediaDisabled}
       forceReducedMotion={reducedMotion}
       containedControls={preview}
-      mediaUnlocked={opened}
+      mediaUnlocked={phase !== 'closed'}
+      controlsRaised={phase === 'full'}
     >
       <div
         lang={locale}
-        data-invitation-side={opened ? 'back' : 'front'}
-        className="mx-auto min-h-screen max-w-5xl overflow-x-clip px-3 pb-44 pt-4 @md:px-8"
+        data-invitation-side={phase === 'full' ? 'back' : 'front'}
+        data-invitation-phase={phase}
+        className={`mx-auto min-h-screen max-w-5xl overflow-x-clip px-3 pt-4 @md:px-8 ${phase === 'full' ? 'pb-44' : 'pb-24'}`}
       >
         <header className="flex flex-wrap items-center justify-between gap-3">
           {preview ? (
@@ -129,40 +151,98 @@ export function PublicInvitation({
           )}
           <LanguageSelector locale={locale} dictionary={dictionary} onChange={setLocale} />
         </header>
-        {!opened ? (
-          <article className="invitation-front invitation-closed-card mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950 shadow-2xl">
-            {event.presentation.thumbnailRef ? (
-              <img
-                src={event.presentation.thumbnailRef}
-                alt={content.thumbnailAltText}
-                className="aspect-[4/3] w-full object-cover"
-              />
-            ) : (
-              <div className="aspect-[4/3] bg-[radial-gradient(circle_at_50%_30%,#155e75,#172554_48%,#020617)]" />
-            )}
-            <div className="absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent px-5 pb-7 text-center @md:pb-10">
-              <h1 className="text-4xl font-black text-balance drop-shadow-2xl @md:text-6xl">
-                {content.celebrantName}
-              </h1>
-              {event.celebrantAge ? (
-                <p className="mt-1 text-lg font-bold text-amber-100 drop-shadow-lg">
-                  {dictionary.invitation.turningAge.replace('{age}', String(event.celebrantAge))}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                title={dictionary.invitation.openInvitation}
-                aria-label={dictionary.invitation.openInvitation}
-                onClick={() => {
-                  void media.current?.unlockAudio();
-                  setOpened(true);
-                }}
-                className="mt-5 inline-flex size-14 items-center justify-center rounded-full bg-amber-300 text-slate-950 shadow-xl transition hover:scale-105 hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+        {phase !== 'full' ? (
+          <>
+            <article className="invitation-front invitation-closed-card mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950 shadow-2xl">
+              {event.presentation.thumbnailRef ? (
+                <img
+                  src={event.presentation.thumbnailRef}
+                  alt={content.thumbnailAltText}
+                  className="aspect-[4/3] w-full object-cover"
+                />
+              ) : (
+                <div className="aspect-[4/3] bg-[radial-gradient(circle_at_50%_30%,#155e75,#172554_48%,#020617)]" />
+              )}
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent px-5 text-center">
+                <h1 className="text-4xl font-black text-balance drop-shadow-2xl @md:text-6xl">
+                  {content.celebrantName}
+                </h1>
+                {event.celebrantAge ? (
+                  <p className="mt-1 text-lg font-bold text-amber-100 drop-shadow-lg">
+                    {dictionary.invitation.turningAge.replace('{age}', String(event.celebrantAge))}
+                  </p>
+                ) : null}
+                {phase === 'closed' ? (
+                  <div className="mt-5 flex flex-col items-center">
+                    <button
+                      type="button"
+                      title={dictionary.invitation.openInvitation}
+                      aria-label={dictionary.invitation.openInvitation}
+                      onClick={() => {
+                        void media.current?.unlockAudio();
+                        setPhase('summary');
+                      }}
+                      className="invitation-envelope-button relative flex size-16 items-center justify-center rounded-full border border-amber-200/60 bg-slate-950/45 text-amber-200 shadow-xl backdrop-blur-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+                    >
+                      <Mail aria-hidden size={28} className="invitation-envelope-closed absolute" />
+                      <MailOpen
+                        aria-hidden
+                        size={28}
+                        className="invitation-envelope-open absolute"
+                      />
+                    </button>
+                    <span className="mt-2 text-sm font-black text-amber-100 drop-shadow-lg">
+                      {dictionary.invitation.openInvitation}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    aria-hidden
+                    className="invitation-envelope-opened mt-5 flex size-16 items-center justify-center rounded-full border border-amber-200/45 bg-slate-950/40 text-amber-200"
+                  >
+                    <MailOpen size={28} />
+                  </div>
+                )}
+              </div>
+            </article>
+            {phase === 'summary' ? (
+              <section
+                ref={summary}
+                aria-label={dictionary.invitation.youAreInvited}
+                className="invitation-summary mx-auto mt-5 max-w-2xl scroll-mt-4 rounded-[2rem] border border-white/15 bg-slate-950/82 px-5 py-7 text-center shadow-2xl backdrop-blur-xl @md:px-10 @md:py-9"
               >
-                <MailOpen aria-hidden size={23} />
-              </button>
-            </div>
-          </article>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-200">
+                  {dictionary.invitation.youAreInvited}
+                </p>
+                <h2 className="mt-3 text-2xl font-black text-white @md:text-3xl">
+                  {invitation.guestDisplayName}
+                </h2>
+                {hostMessage ? (
+                  <RichText
+                    value={hostMessage}
+                    className="rich-text invitation-summary-copy mx-auto mt-4 max-w-xl text-slate-200"
+                  />
+                ) : null}
+                {summaryInstructions ? (
+                  <div className="mx-auto mt-4 max-w-xl border-t border-white/10 pt-4">
+                    <h3 className="text-sm font-black text-cyan-100">{summaryInstructionsTitle}</h3>
+                    <RichText
+                      value={summaryInstructions}
+                      className="rich-text invitation-summary-copy mt-1 text-slate-300"
+                    />
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setPhase('full')}
+                  className="mx-auto mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-amber-300 px-6 py-3 font-black text-slate-950 shadow-xl hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+                >
+                  <MailOpen aria-hidden size={19} />
+                  {dictionary.invitation.openInvitation}
+                </button>
+              </section>
+            ) : null}
+          </>
         ) : (
           <article
             className={`invitation-back invitation-opening-${event.presentation.mode.toLowerCase()} relative mx-auto mt-5 overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/80 shadow-2xl backdrop-blur-xl`}
@@ -175,7 +255,7 @@ export function PublicInvitation({
                 type="button"
                 title={dictionary.invitation.viewFront}
                 aria-label={dictionary.invitation.viewFront}
-                onClick={() => setOpened(false)}
+                onClick={() => setPhase('summary')}
                 className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 hover:bg-white/10"
               >
                 <RotateCcw aria-hidden size={17} />
@@ -249,7 +329,7 @@ export function PublicInvitation({
             </div>
           </article>
         )}
-        {opened ? (
+        {phase === 'full' ? (
           <RsvpPanel
             invitation={invitation}
             dictionary={dictionary}
@@ -287,8 +367,8 @@ function Collapsible({
   );
 }
 
-function RichText({ value }: { value: string }) {
-  return <div dangerouslySetInnerHTML={{ __html: richTextToHtml(value) }} />;
+function RichText({ value, className }: { value: string; className?: string }) {
+  return <div className={className} dangerouslySetInnerHTML={{ __html: richTextToHtml(value) }} />;
 }
 
 function RsvpPanel({

@@ -30,24 +30,18 @@ export class RsvpRateLimiter {
     this.now = Date.now;
   }
 
-  static createForTesting(
-    options: RsvpRateLimiterOptions = {},
-  ): RsvpRateLimiter {
+  static createForTesting(options: RsvpRateLimiterOptions = {}): RsvpRateLimiter {
     const limiter = new RsvpRateLimiter();
 
-    limiter.maximumAttempts =
-      options.maximumAttempts ?? defaultMaximumAttempts;
-    limiter.windowMilliseconds =
-      options.windowMilliseconds ?? defaultWindowMilliseconds;
+    limiter.maximumAttempts = options.maximumAttempts ?? defaultMaximumAttempts;
+    limiter.windowMilliseconds = options.windowMilliseconds ?? defaultWindowMilliseconds;
     limiter.now = options.now ?? Date.now;
 
     return limiter;
   }
 
   consume(material: string): boolean {
-    const key = createHmac('sha256', this.secret)
-      .update(material)
-      .digest('hex');
+    const key = createHmac('sha256', this.secret).update(material).digest('hex');
 
     const now = this.now();
     const bucket = this.buckets.get(key);

@@ -35,19 +35,15 @@ export class InvitationLookupRateLimiter {
   ): InvitationLookupRateLimiter {
     const limiter = new InvitationLookupRateLimiter();
 
-    limiter.maximumAttempts =
-      options.maximumAttempts ?? defaultMaximumAttempts;
-    limiter.windowMilliseconds =
-      options.windowMilliseconds ?? defaultWindowMilliseconds;
+    limiter.maximumAttempts = options.maximumAttempts ?? defaultMaximumAttempts;
+    limiter.windowMilliseconds = options.windowMilliseconds ?? defaultWindowMilliseconds;
     limiter.now = options.now ?? Date.now;
 
     return limiter;
   }
 
   consume(requestKeyMaterial: string): boolean {
-    const key = createHmac('sha256', this.secret)
-      .update(requestKeyMaterial)
-      .digest('hex');
+    const key = createHmac('sha256', this.secret).update(requestKeyMaterial).digest('hex');
 
     const now = this.now();
     const current = this.buckets.get(key);

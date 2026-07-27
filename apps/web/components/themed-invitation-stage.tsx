@@ -25,6 +25,7 @@ type ThemedInvitationStageProps = {
   forceReducedMotion?: boolean;
   containedControls?: boolean;
   mediaUnlocked?: boolean;
+  controlsRaised?: boolean;
   children: ReactNode;
 };
 
@@ -38,6 +39,7 @@ export const ThemedInvitationStage = forwardRef<InvitationMediaHandle, ThemedInv
       forceReducedMotion = false,
       containedControls = false,
       mediaUnlocked = true,
+      controlsRaised = false,
       children,
     },
     ref,
@@ -177,7 +179,7 @@ export const ThemedInvitationStage = forwardRef<InvitationMediaHandle, ThemedInv
         {(!privateExperience || mediaUnlocked) &&
         (showVideo || Boolean(presentation.audioRef && !mediaDisabled)) ? (
           <div
-            className={`${containedControls ? (privateExperience ? 'absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))]' : 'absolute bottom-3') : privateExperience ? 'fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))]' : 'fixed bottom-3'} invitation-media-controls inset-x-0 z-30 mx-auto flex w-fit max-w-[calc(100%-1.5rem)] flex-wrap justify-center gap-2 rounded-full border border-white/15 bg-slate-950/82 p-2 shadow-xl backdrop-blur`}
+            className={`${containedControls ? (privateExperience && controlsRaised ? 'absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))]' : 'absolute bottom-3') : privateExperience && controlsRaised ? 'fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))]' : 'fixed bottom-3'} invitation-media-controls inset-x-0 z-30 mx-auto flex w-fit max-w-[calc(100%-1.5rem)] flex-wrap justify-center gap-2 rounded-full border border-white/15 bg-slate-950/82 p-2 shadow-xl backdrop-blur`}
           >
             {showVideo ? (
               <>
