@@ -167,7 +167,7 @@ function EventCard({
         <Action href={`/host/events/${encodeURIComponent(event.identifier)}/guests`}>
           {dictionary.host.manageGuests}
         </Action>
-        <Action href={`/events/${encodeURIComponent(event.publicSlug)}?preview=1`}>
+        <Action href={`/host/events/${encodeURIComponent(event.identifier)}/preview`}>
           {dictionary.host.previewInvitation}
         </Action>
         <Action href={publicUrl} external>

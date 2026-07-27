@@ -40,6 +40,7 @@ export const invitationActivityType = pgEnum('invitation_activity_type', [
   'REVOKED',
   'REGENERATED',
 ]);
+export const invitationLookupMethod = pgEnum('invitation_lookup_method', ['EMAIL', 'PHONE']);
 
 const auditColumns = {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
@@ -245,6 +246,29 @@ export const invitations = pgTable(
       'invitations_revoked_state_check',
       sql`(${table.status} = 'REVOKED' and ${table.revokedAt} is not null) or (${table.status} <> 'REVOKED' and ${table.revokedAt} is null)`,
     ),
+  ],
+);
+
+export const invitationAccessGrants = pgTable(
+  'invitation_access_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    invitationId: uuid('invitation_id')
+      .notNull()
+      .references(() => invitations.id, { onDelete: 'cascade' }),
+    grantTokenHash: text('grant_token_hash').notNull(),
+    grantTokenPrefix: text('grant_token_prefix').notNull(),
+    lookupMethod: invitationLookupMethod('lookup_method').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
+  },
+  (table) => [
+    uniqueIndex('invitation_access_grants_token_hash_unique').on(table.grantTokenHash),
+    index('invitation_access_grants_token_prefix_index').on(table.grantTokenPrefix),
+    index('invitation_access_grants_expiration_index').on(table.expiresAt),
+    index('invitation_access_grants_invitation_id_index').on(table.invitationId),
   ],
 );
 

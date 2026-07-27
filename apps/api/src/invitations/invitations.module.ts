@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { HostInvitationsController } from './host-invitations.controller';
+import { InvitationLookupRateLimiter } from './invitation-lookup-rate-limiter';
+import { InvitationLookupService } from './invitation-lookup.service';
 import { InvitationTokenService } from './invitation-token.service';
 import { InvitationsRepository } from './invitations.repository';
 import { InvitationsService } from './invitations.service';
@@ -11,6 +13,8 @@ import { PublicInvitationsController } from './public-invitations.controller';
   providers: [
     InvitationsRepository,
     InvitationsService,
+    InvitationLookupService,
+    InvitationLookupRateLimiter,
     InvitationTokenService,
     PublicInvitationUrlService,
   ],

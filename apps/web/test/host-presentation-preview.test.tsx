@@ -1,0 +1,24 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { HostPresentationPreview } from '../components/host-presentation-preview';
+import { privateInvitation, publicLanding } from './public-experience-fixture';
+
+describe('protected host presentation preview', () => {
+  it('switches experience and viewport without calling public lookup', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    render(
+      <HostPresentationPreview
+        identifier="raymundo-6"
+        preview={{ landing: publicLanding, invitation: privateInvitation }}
+      />,
+    );
+    expect(screen.getAllByText(/Protected host preview/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Open my invitation' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Private invitation' }));
+    expect(screen.getByText('This invitation was prepared for Family Sample.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tablet' }));
+    expect(screen.getByTestId('preview-viewport')).toHaveAttribute('data-viewport', 'tablet');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+});

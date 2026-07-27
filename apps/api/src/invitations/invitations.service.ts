@@ -1,16 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import {
   createInvitationResultSchema,
-  publicEventSchema,
-  publicInvitationSchema,
   regenerateInvitationResultSchema,
   type CreateInvitationResult,
-  type PublicInvitation,
+  type PrivateInvitation,
   type RegenerateInvitationResult,
 } from '@matemyparty/contracts';
 import type { DatabaseExecutor, guests } from '@matemyparty/database';
-import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { ApiError } from '../common/api-error';
+import { presentPrivateInvitation } from '../events/presentation.presenter';
 import { presentGuest, presentInvitation } from '../guests/guest.presenter';
 import { InvitationTokenService } from './invitation-token.service';
 import { InvitationsRepository } from './invitations.repository';
@@ -80,6 +78,7 @@ export class InvitationsService {
         await this.repository.revoke(previous.id, executor);
         await this.repository.addActivity(previous.id, 'REVOKED', null, executor);
       }
+      await this.repository.revokeAccessGrants(previous.id, executor);
       const guest = await this.repository.guestById(previous.guestId, executor);
       if (!guest || guest.archivedAt) throw new ApiError(404, 'GUEST_NOT_FOUND', 'Guest not found');
       const created = await this.createForGuestInTransaction(guest, executor, 'REGENERATED');
@@ -95,15 +94,19 @@ export class InvitationsService {
     return this.repository.transaction(async (executor) => {
       const existing = await this.repository.findById(invitationId, executor);
       if (!existing) throw new ApiError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
-      if (existing.revokedAt) return presentInvitation(existing);
+      if (existing.revokedAt) {
+        await this.repository.revokeAccessGrants(invitationId, executor);
+        return presentInvitation(existing);
+      }
       const revoked = await this.repository.revoke(invitationId, executor);
       if (!revoked) throw new ApiError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
       await this.repository.addActivity(invitationId, 'REVOKED', null, executor);
+      await this.repository.revokeAccessGrants(invitationId, executor);
       return presentInvitation(revoked);
     });
   }
 
-  resolveAndTrack(token: string, metadata: Record<string, string>): Promise<PublicInvitation> {
+  resolveAndTrack(token: string, metadata: Record<string, string>): Promise<PrivateInvitation> {
     if (!this.tokens.isValidFormat(token)) return Promise.reject(this.publicNotFound());
     return this.repository.transaction(async (executor) => {
       const expectedHash = this.tokens.hash(token);
@@ -112,40 +115,56 @@ export class InvitationsService {
         this.tokens.matches(candidate.publicTokenHash, expectedHash),
       );
       if (!invitation || invitation.revokedAt) throw this.publicNotFound();
-      const openedPreviously = invitation.openCount > 0;
-      const details = await this.repository.publicDetails(invitation.id, executor);
-      if (!details) throw this.publicNotFound();
-      const now = new Date();
-      const opened = await this.repository.recordOpen(invitation.id, now, executor);
-      if (!opened) throw this.publicNotFound();
-      await this.repository.addActivity(invitation.id, 'OPENED', metadata, executor);
-      const event = details.event;
-      const locale: Locale = opened.locale === 'es-MX' ? 'es-MX' : 'en-US';
-      const localizedTitle = details.localization?.title ?? event.title;
-      const thumbnailAltText = details.localization?.thumbnailAltText ?? localizedTitle;
-      return publicInvitationSchema.parse({
-        event: publicEventSchema.parse({
-          ...event,
-          startsAt: event.startsAt.toISOString(),
-          endsAt: event.endsAt?.toISOString() ?? null,
-          rsvpDeadline: event.rsvpDeadline?.toISOString() ?? null,
-        }),
-        guestDisplayName: details.guest.displayName,
-        status: opened.status,
-        locale: opened.locale,
-        openedPreviously,
-        shareMetadata: {
-          title: localizedTitle,
-          description: getDictionary(locale).invitation.shareGeneric.replace(
-            '{eventTitle}',
-            localizedTitle,
-          ),
-          thumbnailImageRef: event.thumbnailImageRef,
-          thumbnailAltText,
-        },
-        capabilities: { canRespond: false, canAddToCalendar: false },
-      });
+      return this.renderAndTrack(invitation, metadata, executor);
     });
+  }
+
+  resolveGrantAndTrack(
+    grantToken: string,
+    metadata: Record<string, string>,
+  ): Promise<PrivateInvitation> {
+    if (!this.tokens.isValidFormat(grantToken)) return Promise.reject(this.publicNotFound());
+    return this.repository.transaction(async (executor) => {
+      const now = new Date();
+      const expectedHash = this.tokens.hash(grantToken);
+      const candidates = await this.repository.accessGrantCandidates(
+        grantToken.slice(0, 8),
+        now,
+        executor,
+      );
+      const candidate = candidates.find(({ grant }) =>
+        this.tokens.matches(grant.grantTokenHash, expectedHash),
+      );
+      if (!candidate) throw this.publicNotFound();
+      if (!(await this.repository.markAccessGrantUsed(candidate.grant.id, now, executor))) {
+        throw this.publicNotFound();
+      }
+      return this.renderAndTrack(candidate.invitation, metadata, executor);
+    });
+  }
+
+  private async renderAndTrack(
+    invitation: Awaited<ReturnType<InvitationsRepository['findById']>> & object,
+    metadata: Record<string, string>,
+    executor: DatabaseExecutor,
+  ) {
+    const openedPreviously = invitation.openCount > 0;
+    const details = await this.repository.publicDetails(invitation.id, executor);
+    if (!details) throw this.publicNotFound();
+    const now = new Date();
+    const opened = await this.repository.recordOpen(invitation.id, now, executor);
+    if (!opened) throw this.publicNotFound();
+    await this.repository.addActivity(invitation.id, 'OPENED', metadata, executor);
+    return presentPrivateInvitation(
+      {
+        event: details.event,
+        localizations: details.localizations,
+        primaryHostname: details.primaryHostname,
+      },
+      details.guest,
+      opened.locale === 'es-MX' ? 'es-MX' : 'en-US',
+      openedPreviously,
+    );
   }
 
   private publicNotFound() {

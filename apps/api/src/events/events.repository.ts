@@ -12,30 +12,6 @@ import {
 } from '@matemyparty/database';
 import { DATABASE } from '../database/database.module';
 
-const publicSelection = {
-  title: events.title,
-  celebrantName: events.celebrantName,
-  celebrantAge: events.celebrantAge,
-  eventType: events.eventType,
-  status: events.status,
-  startsAt: events.startsAt,
-  endsAt: events.endsAt,
-  timezone: events.timezone,
-  locale: events.locale,
-  venueName: events.venueName,
-  addressLine1: events.addressLine1,
-  addressLine2: events.addressLine2,
-  city: events.city,
-  region: events.region,
-  postalCode: events.postalCode,
-  countryCode: events.countryCode,
-  publicSlug: events.publicSlug,
-  templateKey: events.templateKey,
-  templateVersion: events.templateVersion,
-  hostMessage: events.hostMessage,
-  rsvpDeadline: events.rsvpDeadline,
-};
-
 export type PublicEventRow = Awaited<ReturnType<EventsRepository['findBySlug']>>;
 export type HostEventRecord = NonNullable<
   Awaited<ReturnType<EventsRepository['findHostRecordByIdentifier']>>
@@ -51,21 +27,51 @@ export class EventsRepository {
 
   async findByHostname(hostname: string) {
     const rows = await this.connection.db
-      .select(publicSelection)
+      .select({ event: events })
       .from(events)
       .innerJoin(eventDomains, eq(eventDomains.eventId, events.id))
       .where(sql`lower(${eventDomains.hostname}) = ${hostname}`)
       .limit(1);
-    return rows[0] ?? null;
+    const row = rows[0];
+    if (!row) return null;
+    const [localizations, domains] = await Promise.all([
+      this.connection.db
+        .select()
+        .from(eventLocalizations)
+        .where(eq(eventLocalizations.eventId, row.event.id)),
+      this.connection.db
+        .select()
+        .from(eventDomains)
+        .where(eq(eventDomains.eventId, row.event.id))
+        .orderBy(desc(eventDomains.isPrimary)),
+    ]);
+    return {
+      event: row.event,
+      localizations,
+      primaryHostname: domains[0]?.hostname ?? null,
+    };
   }
 
   async findBySlug(slug: string) {
     const rows = await this.connection.db
-      .select(publicSelection)
+      .select()
       .from(events)
       .where(sql`lower(${events.publicSlug}) = ${slug}`)
       .limit(1);
-    return rows[0] ?? null;
+    const event = rows[0];
+    if (!event) return null;
+    const [localizations, domains] = await Promise.all([
+      this.connection.db
+        .select()
+        .from(eventLocalizations)
+        .where(eq(eventLocalizations.eventId, event.id)),
+      this.connection.db
+        .select()
+        .from(eventDomains)
+        .where(eq(eventDomains.eventId, event.id))
+        .orderBy(desc(eventDomains.isPrimary)),
+    ]);
+    return { event, localizations, primaryHostname: domains[0]?.hostname ?? null };
   }
 
   async isPublicCodeTaken(code: string, executor?: DatabaseExecutor): Promise<boolean> {
