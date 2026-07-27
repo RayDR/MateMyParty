@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Daily PostgreSQL backup service and timer with seven-day local retention.
 - Fail-fast deployment automation with validation, pre-migration backup, and health checks.
 - DNS and backup-and-restore documentation.
+- RSVP current state and immutable response history.
+- Bounded total or adult/child attendance, dietary notes, and guest messages.
+- Public RSVP controls plus host statistics, filters, detail, and history views.
 
 ### Changed
 
@@ -22,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Planned
 
-- RSVP management.
+- Maps, calendar downloads/integrations, and event sharing.
 
 ## [0.1.0] - 2026-07-26
 

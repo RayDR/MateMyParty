@@ -5,6 +5,7 @@ import {
   supportedEventLocaleSchema,
 } from './events.js';
 import { invitationCountModeSchema } from './invitations.js';
+import { publicRsvpResponseSchema } from './rsvp.js';
 
 export const invitationPresentationModeSchema = z.enum([
   'NIGHT_DRAGON_FLIGHT',
@@ -69,6 +70,7 @@ export const privateInvitationEventSchema = z.object({
     .url()
     .refine((value) => value.startsWith('https://') || value.startsWith('http://'))
     .nullable(),
+  rsvpDeadline: z.iso.datetime().nullable(),
   localizedContent: z.object({
     'en-US': privateInvitationLocaleSchema,
     'es-MX': privateInvitationLocaleSchema,
@@ -87,6 +89,7 @@ export const privateInvitationSchema = z.object({
   }),
   invitationLocale: supportedEventLocaleSchema,
   openedPreviously: z.boolean(),
+  rsvp: publicRsvpResponseSchema.nullable(),
   shareMetadata: z.object({
     title: z.string().min(1),
     description: z.string().min(1),
@@ -95,7 +98,7 @@ export const privateInvitationSchema = z.object({
     thumbnailAltText: z.string().min(1),
   }),
   capabilities: z.object({
-    canRespond: z.literal(false),
+    canRespond: z.boolean(),
     canAddToCalendar: z.literal(false),
   }),
 });

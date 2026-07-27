@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { eventMediaReferenceSchema, publicEventSchema } from './events.js';
+import { hostRsvpSummarySchema, publicRsvpResponseSchema } from './rsvp.js';
 
 export const supportedLocaleSchema = z.enum(['en-US', 'es-MX']);
 export const preferredChannelSchema = z.enum(['EMAIL', 'SMS', 'BOTH', 'MANUAL']);
@@ -101,6 +102,7 @@ export const invitationSummarySchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   revokedAt: z.iso.datetime().nullable(),
+  rsvp: hostRsvpSummarySchema.nullable().optional(),
 });
 
 export const notificationEligibilitySchema = z.object({
@@ -177,9 +179,10 @@ export const publicInvitationSchema = z.object({
   status: invitationStatusSchema.exclude(['REVOKED']),
   locale: supportedLocaleSchema,
   openedPreviously: z.boolean(),
+  rsvp: publicRsvpResponseSchema.nullable(),
   shareMetadata: publicInvitationShareMetadataSchema,
   capabilities: z.object({
-    canRespond: z.literal(false),
+    canRespond: z.boolean(),
     canAddToCalendar: z.literal(false),
   }),
 });

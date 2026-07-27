@@ -6,9 +6,11 @@ import {
   type NotificationEligibility,
 } from '@matemyparty/contracts';
 import type { guests, invitations } from '@matemyparty/database';
+import type { rsvps } from '@matemyparty/database';
 
 export type GuestRow = typeof guests.$inferSelect;
 export type InvitationRow = typeof invitations.$inferSelect;
+export type RsvpRow = typeof rsvps.$inferSelect;
 export function notificationEligibilityForGuest(row: GuestRow): NotificationEligibility {
   const canEmail = Boolean(row.email);
   const canSms = Boolean(row.phone);
@@ -28,7 +30,10 @@ export function notificationEligibilityForGuest(row: GuestRow): NotificationElig
   };
 }
 
-export function presentInvitation(row: InvitationRow): InvitationSummary {
+export function presentInvitation(
+  row: InvitationRow,
+  rsvp: RsvpRow | null = null,
+): InvitationSummary {
   return invitationSummarySchema.parse({
     id: row.id,
     status: row.status,
@@ -40,10 +45,23 @@ export function presentInvitation(row: InvitationRow): InvitationSummary {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     revokedAt: row.revokedAt?.toISOString() ?? null,
+    rsvp: rsvp
+      ? {
+          status: rsvp.status,
+          totalAttending: rsvp.totalAttending,
+          adultsAttending: rsvp.adultsAttending,
+          childrenAttending: rsvp.childrenAttending,
+          updatedAt: rsvp.updatedAt.toISOString(),
+        }
+      : null,
   });
 }
 
-export function presentGuest(row: GuestRow, invitation: InvitationRow | null): HostGuest {
+export function presentGuest(
+  row: GuestRow,
+  invitation: InvitationRow | null,
+  rsvp: RsvpRow | null = null,
+): HostGuest {
   return hostGuestSchema.parse({
     id: row.id,
     displayName: row.displayName,
@@ -58,7 +76,7 @@ export function presentGuest(row: GuestRow, invitation: InvitationRow | null): H
     childrenInvited: row.childrenInvited,
     privateNotes: row.privateNotes,
     notificationEligibility: notificationEligibilityForGuest(row),
-    invitation: invitation ? presentInvitation(invitation) : null,
+    invitation: invitation ? presentInvitation(invitation, rsvp) : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     archivedAt: row.archivedAt?.toISOString() ?? null,

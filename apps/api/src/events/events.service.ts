@@ -130,7 +130,6 @@ export class EventsService {
       thumbnailImageRef: event.thumbnailImageRef,
       statistics: {
         ...record.statistics,
-        rsvp: { available: false, attending: null, declined: null, pending: null },
       },
     });
   }

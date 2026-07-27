@@ -58,6 +58,35 @@ function mockRequests(currentGuest: HostGuest = guest) {
         revoked: 0,
         notContactable: 1,
       });
+    if (url.includes('/rsvp-statistics'))
+      return response({
+        pending: currentGuest.invitation?.rsvp ? 0 : currentGuest.invitation ? 1 : 0,
+        accepted: currentGuest.invitation?.rsvp?.status === 'ACCEPTED' ? 1 : 0,
+        declined: 0,
+        notSure: 0,
+        cancelled: 0,
+        confirmedTotal: currentGuest.invitation?.rsvp?.totalAttending ?? 0,
+        confirmedAdults: currentGuest.invitation?.rsvp?.adultsAttending ?? 0,
+        confirmedChildren: currentGuest.invitation?.rsvp?.childrenAttending ?? 0,
+        invitationsWithoutResponse: currentGuest.invitation?.rsvp ? 0 : 1,
+      });
+    if (url.includes('/invitations/') && url.endsWith('/rsvp'))
+      return response({
+        invitationId: currentGuest.invitation?.id,
+        guestId: currentGuest.id,
+        guestDisplayName: currentGuest.displayName,
+        invitationCountMode: currentGuest.invitationCountMode,
+        invited: { total: 4, adults: null, children: null },
+        current: currentGuest.invitation?.rsvp
+          ? {
+              ...currentGuest.invitation.rsvp,
+              dietaryNotes: 'No peanuts',
+              guestMessage: 'See you there',
+              respondedAt: '2026-07-27T01:00:00.000Z',
+            }
+          : null,
+        history: [],
+      });
     if (url.includes('/guests?')) return response([currentGuest]);
     if (url.endsWith('/internal/host/events/raymundo-6')) return response(hostEventDetail);
     return response({});
@@ -129,5 +158,38 @@ describe('host guest management screen', () => {
       childrenInvited: null,
     });
     expect(window.location.pathname).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27}/i);
+  });
+
+  it('filters RSVP state and opens the host-only current response detail', async () => {
+    const invitedGuest: HostGuest = {
+      ...guest,
+      invitation: {
+        id: '77777777-7777-4777-8777-777777777777',
+        status: 'OPENED',
+        locale: 'en-US',
+        tokenPrefix: 'abcdefgh',
+        firstOpenedAt: '2026-07-27T00:00:00.000Z',
+        lastOpenedAt: '2026-07-27T00:00:00.000Z',
+        openCount: 1,
+        createdAt: '2026-07-26T00:00:00.000Z',
+        updatedAt: '2026-07-27T01:00:00.000Z',
+        revokedAt: null,
+        rsvp: {
+          status: 'ACCEPTED',
+          totalAttending: 3,
+          adultsAttending: null,
+          childrenAttending: null,
+          updatedAt: '2026-07-27T01:00:00.000Z',
+        },
+      },
+    };
+    mockRequests(invitedGuest);
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+    await screen.findAllByRole('heading', { name: 'Family Sample' });
+    expect(screen.getAllByText('3 attending').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole('button', { name: 'RSVP details' })[0]!);
+    expect(await screen.findByRole('dialog', { name: 'RSVP details' })).toBeInTheDocument();
+    expect(screen.getByText(/No peanuts/)).toBeInTheDocument();
+    expect(screen.getByText(/See you there/)).toBeInTheDocument();
   });
 });

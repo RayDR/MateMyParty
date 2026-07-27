@@ -95,10 +95,15 @@ export const hostEventStatisticsSchema = z.object({
   invitationCount: z.number().int().nonnegative(),
   openedCount: z.number().int().nonnegative(),
   rsvp: z.object({
-    available: z.literal(false),
-    attending: z.null(),
-    declined: z.null(),
-    pending: z.null(),
+    pending: z.number().int().nonnegative(),
+    accepted: z.number().int().nonnegative(),
+    declined: z.number().int().nonnegative(),
+    notSure: z.number().int().nonnegative(),
+    cancelled: z.number().int().nonnegative(),
+    confirmedTotal: z.number().int().nonnegative(),
+    confirmedAdults: z.number().int().nonnegative(),
+    confirmedChildren: z.number().int().nonnegative(),
+    invitationsWithoutResponse: z.number().int().nonnegative(),
   }),
 });
 

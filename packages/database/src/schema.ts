@@ -41,6 +41,8 @@ export const invitationActivityType = pgEnum('invitation_activity_type', [
   'REGENERATED',
 ]);
 export const invitationLookupMethod = pgEnum('invitation_lookup_method', ['EMAIL', 'PHONE']);
+export const rsvpStatus = pgEnum('rsvp_status', ['ACCEPTED', 'DECLINED', 'NOT_SURE', 'CANCELLED']);
+export const rsvpChangeSource = pgEnum('rsvp_change_source', ['INVITEE', 'HOST']);
 
 const auditColumns = {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
@@ -286,4 +288,72 @@ export const invitationActivities = pgTable(
     metadata: jsonb('metadata'),
   },
   (table) => [index('invitation_activities_invitation_id_index').on(table.invitationId)],
+);
+
+export const rsvps = pgTable(
+  'rsvps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    invitationId: uuid('invitation_id')
+      .notNull()
+      .references(() => invitations.id),
+    status: rsvpStatus('status').notNull(),
+    totalAttending: integer('total_attending'),
+    adultsAttending: integer('adults_attending'),
+    childrenAttending: integer('children_attending'),
+    dietaryNotes: text('dietary_notes'),
+    guestMessage: text('guest_message'),
+    respondedAt: timestamp('responded_at', { withTimezone: true, mode: 'date' })
+      .defaultNow()
+      .notNull(),
+    ...auditColumns,
+  },
+  (table) => [
+    uniqueIndex('rsvps_invitation_id_unique').on(table.invitationId),
+    index('rsvps_status_index').on(table.status),
+    check(
+      'rsvps_attendance_non_negative_check',
+      sql`${table.totalAttending} is null or ${table.totalAttending} >= 0`,
+    ),
+    check(
+      'rsvps_adults_attending_non_negative_check',
+      sql`${table.adultsAttending} is null or ${table.adultsAttending} >= 0`,
+    ),
+    check(
+      'rsvps_children_attending_non_negative_check',
+      sql`${table.childrenAttending} is null or ${table.childrenAttending} >= 0`,
+    ),
+    check(
+      'rsvps_non_attending_counts_cleared_check',
+      sql`${table.status} = 'ACCEPTED' or (${table.totalAttending} is null and ${table.adultsAttending} is null and ${table.childrenAttending} is null)`,
+    ),
+    check('rsvps_dietary_notes_length_check', sql`length(${table.dietaryNotes}) <= 500`),
+    check('rsvps_guest_message_length_check', sql`length(${table.guestMessage}) <= 1000`),
+  ],
+);
+
+export const rsvpHistory = pgTable(
+  'rsvp_history',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    rsvpId: uuid('rsvp_id')
+      .notNull()
+      .references(() => rsvps.id),
+    invitationId: uuid('invitation_id')
+      .notNull()
+      .references(() => invitations.id),
+    status: rsvpStatus('status').notNull(),
+    totalAttending: integer('total_attending'),
+    adultsAttending: integer('adults_attending'),
+    childrenAttending: integer('children_attending'),
+    dietaryNotes: text('dietary_notes'),
+    guestMessage: text('guest_message'),
+    source: rsvpChangeSource('source').notNull(),
+    respondedAt: timestamp('responded_at', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('rsvp_history_rsvp_id_index').on(table.rsvpId),
+    index('rsvp_history_invitation_id_created_at_index').on(table.invitationId, table.createdAt),
+  ],
 );

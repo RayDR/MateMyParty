@@ -9,6 +9,7 @@ import {
   events,
   guests,
   invitations,
+  rsvps,
 } from '@matemyparty/database';
 import { DATABASE } from '../database/database.module';
 
@@ -126,9 +127,25 @@ export class EventsRepository {
         .select({
           invitationCount: count(),
           openedCount: count(sql`case when ${invitations.openCount} > 0 then 1 end`),
+          rsvpPending: count(sql`case when ${rsvps.id} is null then 1 end`),
+          rsvpAccepted: count(sql`case when ${rsvps.status} = 'ACCEPTED' then 1 end`),
+          rsvpDeclined: count(sql`case when ${rsvps.status} = 'DECLINED' then 1 end`),
+          rsvpNotSure: count(sql`case when ${rsvps.status} = 'NOT_SURE' then 1 end`),
+          rsvpCancelled: count(sql`case when ${rsvps.status} = 'CANCELLED' then 1 end`),
+          confirmedTotal: sql<number>`coalesce(sum(case when ${rsvps.status} = 'ACCEPTED' then ${rsvps.totalAttending} else 0 end), 0)`,
+          confirmedAdults: sql<number>`coalesce(sum(case when ${rsvps.status} = 'ACCEPTED' then ${rsvps.adultsAttending} else 0 end), 0)`,
+          confirmedChildren: sql<number>`coalesce(sum(case when ${rsvps.status} = 'ACCEPTED' then ${rsvps.childrenAttending} else 0 end), 0)`,
         })
         .from(invitations)
-        .where(and(eq(invitations.eventId, eventId), isNull(invitations.revokedAt))),
+        .innerJoin(guests, eq(guests.id, invitations.guestId))
+        .leftJoin(rsvps, eq(rsvps.invitationId, invitations.id))
+        .where(
+          and(
+            eq(invitations.eventId, eventId),
+            isNull(invitations.revokedAt),
+            isNull(guests.archivedAt),
+          ),
+        ),
       database
         .select({ revisionNumber: eventRevisions.revisionNumber })
         .from(eventRevisions)
@@ -144,6 +161,17 @@ export class EventsRepository {
         guestCount: Number(guestStats[0]?.value ?? 0),
         invitationCount: Number(invitationStats[0]?.invitationCount ?? 0),
         openedCount: Number(invitationStats[0]?.openedCount ?? 0),
+        rsvp: {
+          pending: Number(invitationStats[0]?.rsvpPending ?? 0),
+          accepted: Number(invitationStats[0]?.rsvpAccepted ?? 0),
+          declined: Number(invitationStats[0]?.rsvpDeclined ?? 0),
+          notSure: Number(invitationStats[0]?.rsvpNotSure ?? 0),
+          cancelled: Number(invitationStats[0]?.rsvpCancelled ?? 0),
+          confirmedTotal: Number(invitationStats[0]?.confirmedTotal ?? 0),
+          confirmedAdults: Number(invitationStats[0]?.confirmedAdults ?? 0),
+          confirmedChildren: Number(invitationStats[0]?.confirmedChildren ?? 0),
+          invitationsWithoutResponse: Number(invitationStats[0]?.rsvpPending ?? 0),
+        },
       },
       revisionNumber: revisions[0]?.revisionNumber ?? 0,
     };

@@ -22,13 +22,14 @@ export async function generateMetadata({
 }
 
 export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
-  const invitation = await getPublicInvitation((await params).token);
+  const token = (await params).token;
+  const invitation = await getPublicInvitation(token);
   const locale = await preferredLocale(
     invitation?.invitationLocale,
     invitation?.event.defaultLocale,
   );
   return invitation ? (
-    <PublicInvitation invitation={invitation} initialLocale={locale} />
+    <PublicInvitation invitation={invitation} initialLocale={locale} accessToken={token} />
   ) : (
     <InvalidInvitation locale={locale} />
   );

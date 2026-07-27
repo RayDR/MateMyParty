@@ -5,6 +5,7 @@ import {
   type CreateInvitationResult,
   type PrivateInvitation,
   type RegenerateInvitationResult,
+  type PublicRsvpResponse,
 } from '@matemyparty/contracts';
 import type { DatabaseExecutor, guests } from '@matemyparty/database';
 import { ApiError } from '../common/api-error';
@@ -143,6 +144,43 @@ export class InvitationsService {
     });
   }
 
+  async resolveAccess(
+    permanentToken: string | undefined,
+    grantToken: string | undefined,
+    executor: DatabaseExecutor,
+  ) {
+    if (permanentToken && this.tokens.isValidFormat(permanentToken)) {
+      const expectedHash = this.tokens.hash(permanentToken);
+      const candidates = await this.repository.candidatesByPrefix(
+        permanentToken.slice(0, 8),
+        executor,
+      );
+      const invitation = candidates.find((candidate) =>
+        this.tokens.matches(candidate.publicTokenHash, expectedHash),
+      );
+      if (invitation) return invitation;
+    }
+    if (grantToken && this.tokens.isValidFormat(grantToken)) {
+      const now = new Date();
+      const expectedHash = this.tokens.hash(grantToken);
+      const candidates = await this.repository.accessGrantCandidates(
+        grantToken.slice(0, 8),
+        now,
+        executor,
+      );
+      const candidate = candidates.find(({ grant }) =>
+        this.tokens.matches(grant.grantTokenHash, expectedHash),
+      );
+      if (
+        candidate &&
+        (await this.repository.markAccessGrantUsed(candidate.grant.id, now, executor))
+      ) {
+        return candidate.invitation;
+      }
+    }
+    throw this.publicNotFound();
+  }
+
   private async renderAndTrack(
     invitation: Awaited<ReturnType<InvitationsRepository['findById']>> & object,
     metadata: Record<string, string>,
@@ -164,7 +202,26 @@ export class InvitationsService {
       details.guest,
       opened.locale === 'es-MX' ? 'es-MX' : 'en-US',
       openedPreviously,
+      details.rsvp ? this.presentRsvp(details.rsvp) : null,
+      true,
     );
+  }
+
+  private presentRsvp(
+    row: NonNullable<
+      NonNullable<Awaited<ReturnType<InvitationsRepository['publicDetails']>>>['rsvp']
+    >,
+  ): PublicRsvpResponse {
+    return {
+      status: row.status,
+      totalAttending: row.totalAttending,
+      adultsAttending: row.adultsAttending,
+      childrenAttending: row.childrenAttending,
+      dietaryNotes: row.dietaryNotes,
+      guestMessage: row.guestMessage,
+      respondedAt: row.respondedAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   private publicNotFound() {
