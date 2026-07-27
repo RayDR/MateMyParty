@@ -8,10 +8,12 @@ export function EventCountdown({
   startsAt,
   endsAt,
   dictionary,
+  presentation = 'cards',
 }: {
   startsAt: string;
   endsAt: string | null;
   dictionary: Dictionary;
+  presentation?: 'cards' | 'watermark';
 }) {
   const [countdown, setCountdown] = useState<CountdownState | null>(null);
   useEffect(() => {
@@ -22,14 +24,37 @@ export function EventCountdown({
   }, [endsAt, startsAt]);
 
   if (!countdown) {
-    return <div aria-hidden="true" className="mt-6 h-20 rounded-2xl bg-white/5" />;
+    return presentation === 'watermark' ? null : (
+      <div aria-hidden="true" className="mt-6 h-20 rounded-2xl bg-white/5" />
+    );
   }
   if (countdown.status === 'STARTED' || countdown.status === 'COMPLETED') {
     return (
-      <p role="timer" className="mt-6 rounded-2xl bg-violet-500/15 p-5 text-center font-black">
+      <p
+        role="timer"
+        data-countdown-presentation={presentation}
+        className={
+          presentation === 'watermark'
+            ? 'invitation-countdown-watermark'
+            : 'mt-6 rounded-2xl bg-violet-500/15 p-5 text-center font-black'
+        }
+      >
         {countdown.status === 'STARTED'
           ? dictionary.invitation.countdownStarted
           : dictionary.invitation.countdownCompleted}
+      </p>
+    );
+  }
+  if (presentation === 'watermark') {
+    const visual = `${countdown.days}${dictionary.invitation.countdownDaysShort} · ${countdown.hours}${dictionary.invitation.countdownHoursShort} · ${countdown.minutes}${dictionary.invitation.countdownMinutesShort}`;
+    return (
+      <p
+        role="timer"
+        data-countdown-presentation="watermark"
+        aria-label={`${dictionary.invitation.countdownTitle}: ${countdown.days} ${dictionary.invitation.countdownDays}, ${countdown.hours} ${dictionary.invitation.countdownHours}, ${countdown.minutes} ${dictionary.invitation.countdownMinutes}`}
+        className="invitation-countdown-watermark"
+      >
+        <span aria-hidden>{visual}</span>
       </p>
     );
   }

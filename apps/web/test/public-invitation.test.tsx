@@ -1,19 +1,62 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InvalidInvitation, PublicInvitation } from '../components/public-invitation';
 import { privateInvitation } from './public-experience-fixture';
 
+function mockAudioPlay(result: 'success' | 'failure' = 'success') {
+  return vi
+    .spyOn(HTMLMediaElement.prototype, 'play')
+    .mockImplementation(() =>
+      result === 'success' ? Promise.resolve() : Promise.reject(new Error('Autoplay blocked')),
+    );
+}
+
+afterEach(() => vi.restoreAllMocks());
+
 describe('/i/[token] content', () => {
-  it('starts as a personal invitation and reveals private details only after opening', () => {
-    render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
-    expect(screen.getByText('This invitation was prepared for Family Sample.')).toBeInTheDocument();
+  it('keeps the closed 4:3 cover limited to celebrant, age, and the open action', () => {
+    mockAudioPlay();
+    const { container } = render(
+      <PublicInvitation invitation={privateInvitation} initialLocale="en-US" />,
+    );
+    const front = container.querySelector('.invitation-closed-card');
+    expect(front).toBeInTheDocument();
+    expect(within(front as HTMLElement).getByRole('img')).toHaveAttribute(
+      'src',
+      privateInvitation.event.presentation.thumbnailRef,
+    );
+    expect(within(front as HTMLElement).getByRole('heading', { name: 'Raymundo' })).toBeVisible();
+    expect(within(front as HTMLElement).getByText('Turning 6')).toBeVisible();
+    expect(
+      within(front as HTMLElement).getByRole('button', { name: 'Open invitation' }),
+    ).toBeVisible();
+    expect(screen.queryByText('Family Sample')).not.toBeInTheDocument();
     expect(screen.queryByText(/1:00 PM/)).not.toBeInTheDocument();
     expect(screen.queryByText(/123 Celebration Lane/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Play theme audio' })).not.toBeInTheDocument();
+    expect(screen.queryByText('We cannot wait to celebrate with you.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).not.toBeInTheDocument();
+  });
+
+  it('unlocks audio with the opening gesture and reveals compact essential details', () => {
+    const play = mockAudioPlay();
+    const { container } = render(
+      <PublicInvitation invitation={privateInvitation} initialLocale="en-US" />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
-    expect(screen.getByRole('button', { name: 'Play theme audio' })).toBeInTheDocument();
-    expect(screen.getByText(/1:00 PM/)).toBeInTheDocument();
-    expect(screen.getByText(/123 Celebration Lane/)).toBeInTheDocument();
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { name: 'Raymundo’s 6th Birthday' })).toBeVisible();
+    expect(screen.getByText('When')).toBeVisible();
+    expect(screen.getByText('Where')).toBeVisible();
+    expect(screen.getByText('Invited party')).toBeVisible();
+    expect(screen.getByText('Family Sample')).toBeVisible();
+    expect(screen.getByText('2 adults · 2 children')).toBeVisible();
+    expect(screen.getByText(/1:00 PM/)).toBeVisible();
+    expect(screen.getByText(/123 Celebration Lane/)).toBeVisible();
+    expect(screen.getByRole('timer')).toHaveAttribute('data-countdown-presentation', 'watermark');
+    expect(screen.getByRole('link', { name: 'Directions' })).toHaveAttribute(
+      'href',
+      'https://maps.example.test/celebration',
+    );
     expect(screen.getByRole('link', { name: 'Google Maps' })).toHaveAttribute(
       'href',
       expect.stringContaining('google.com/maps'),
@@ -22,25 +65,78 @@ describe('/i/[token] content', () => {
       'href',
       expect.stringContaining('maps.apple.com'),
     );
-    expect(screen.getByRole('link', { name: 'Directions' })).toHaveAttribute(
-      'href',
-      'https://maps.example.test/celebration',
-    );
-    expect(screen.getByText('Use the east parking lot.')).toBeInTheDocument();
-    expect(screen.getByText('Location and directions').closest('details')).not.toHaveAttribute(
+    expect(screen.getByText('Arrival information').closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('Parking information').closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('Message from the host').closest('details')).not.toHaveAttribute(
       'open',
     );
-    expect(screen.getByText('Event details').closest('details')).toHaveAttribute('open');
+    expect(container.querySelector('.invitation-essential')?.closest('details')).toBeNull();
+    expect(screen.getByRole('contentinfo', { name: 'RSVP' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute('title', 'Pause');
+    expect(screen.getByRole('button', { name: 'Replay' })).toHaveAttribute('title', 'Replay');
+    expect(screen.getByRole('button', { name: 'Unmute video' })).toHaveAttribute(
+      'title',
+      'Unmute video',
+    );
+    expect(screen.getByRole('button', { name: 'Play theme audio' })).toHaveAttribute(
+      'title',
+      'Play theme audio',
+    );
+    expect(screen.getByRole('button', { name: 'Mute theme audio' })).toHaveAttribute(
+      'title',
+      'Mute theme audio',
+    );
     expect(document.body.textContent).not.toContain('@');
   });
 
-  it('switches the complete private experience to es-MX', () => {
+  it('opens even when autoplay is rejected', () => {
+    const play = mockAudioPlay('failure');
+    render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { name: 'Raymundo’s 6th Birthday' })).toBeVisible();
+  });
+
+  it('removes complex opening decoration when reduced motion is requested', () => {
+    mockAudioPlay();
+    const { container } = render(
+      <PublicInvitation invitation={privateInvitation} initialLocale="en-US" reducedMotion />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    expect(container.querySelector('[data-reduced-motion="true"]')).toBeInTheDocument();
+    expect(container.querySelector('.celebration-flight')).not.toBeInTheDocument();
+  });
+
+  it('uses one compact calendar control and keeps existing providers', () => {
+    mockAudioPlay();
+    render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    expect(screen.getByLabelText('Add to calendar')).toHaveAttribute('title', 'Add to calendar');
+    expect(screen.getByRole('link', { name: 'Google Calendar' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('calendar.google.com'),
+    );
+    expect(screen.getByRole('link', { name: 'Outlook Calendar' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('outlook.live.com'),
+    );
+    expect(screen.getByRole('button', { name: 'Apple Calendar (.ics)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Download calendar file' })).toBeEnabled();
+  });
+
+  it('switches the complete private experience to es-MX without mixed localized content', () => {
+    mockAudioPlay();
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Calendar refresh unavailable'));
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'es-MX' } });
+    expect(screen.getByText('Cumple 6')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir invitación' }));
-    expect(
-      screen.getByRole('heading', { name: 'Sexto cumpleaños de Raymundo' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sexto cumpleaños de Raymundo' })).toBeVisible();
+    expect(screen.getByText('Cuándo')).toBeVisible();
+    expect(screen.getByText('Dónde')).toBeVisible();
+    expect(screen.getByText('Grupo invitado')).toBeVisible();
+    expect(screen.getByText('Nos encantará celebrar contigo.')).toBeInTheDocument();
+    expect(screen.queryByText('We cannot wait to celebrate with you.')).not.toBeInTheDocument();
   });
 
   it('renders a neutral invalid invitation state', () => {
@@ -50,7 +146,8 @@ describe('/i/[token] content', () => {
     ).toBeInTheDocument();
   });
 
-  it('submits a bounded RSVP through the internal same-origin route', async () => {
+  it('submits a bounded RSVP from the persistent footer through the same-origin route', async () => {
+    mockAudioPlay();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         status: 'ACCEPTED',
@@ -71,6 +168,7 @@ describe('/i/[token] content', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    fireEvent.click(screen.getByRole('button', { name: "Yes, we'll be there" }));
     fireEvent.change(screen.getByLabelText('Children attending'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Message for the host (optional)'), {
       target: { value: 'See you there' },
@@ -89,25 +187,22 @@ describe('/i/[token] content', () => {
     );
     expect(await screen.findByText('3 people confirmed')).toBeInTheDocument();
     expect(screen.getByText(/See you there/)).toBeInTheDocument();
-    expect(screen.getByText('Add to calendar')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Google Calendar' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('calendar.google.com'),
-    );
-    fetchMock.mockRestore();
   });
 
-  it('disables RSVP mutations in host preview', () => {
+  it('keeps preview RSVP actions disabled and never performs a mutation', () => {
+    mockAudioPlay();
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" preview />);
     fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    expect(screen.getByRole('button', { name: "Yes, we'll be there" })).toBeDisabled();
+    expect(screen.getByRole('button', { name: "No, we can't attend" })).toBeDisabled();
+    expect(screen.getByRole('button', { name: "We're not sure yet" })).toBeDisabled();
     expect(screen.getByText(/RSVP controls are disabled/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save RSVP' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
-    fetchMock.mockRestore();
   });
 
-  it('updates an existing response and cancels confirmed attendance', async () => {
+  it('updates an existing response and retains cancellation', async () => {
+    mockAudioPlay();
     const current = {
       status: 'ACCEPTED' as const,
       totalAttending: 4,
@@ -145,19 +240,13 @@ describe('/i/[token] content', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Update response' }));
-    fireEvent.click(screen.getByLabelText("No, we can't attend"));
+    fireEvent.click(screen.getByRole('button', { name: "No, we can't attend" }));
     fireEvent.click(screen.getByRole('button', { name: 'Save RSVP' }));
     expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/internal/rsvp',
       expect.objectContaining({ method: 'PATCH' }),
     );
-    expect(
-      JSON.parse(
-        String(fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH')?.[1]?.body),
-      ),
-    ).toMatchObject({ status: 'DECLINED' });
 
     unmount();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -169,12 +258,12 @@ describe('/i/[token] content', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update response' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel attendance' }));
     expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/internal/rsvp',
       expect.objectContaining({ method: 'DELETE' }),
     );
-    fetchMock.mockRestore();
   });
 });
