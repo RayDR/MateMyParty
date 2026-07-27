@@ -311,6 +311,7 @@ export const rsvps = pgTable(
   (table) => [
     uniqueIndex('rsvps_invitation_id_unique').on(table.invitationId),
     index('rsvps_status_index').on(table.status),
+    index('rsvps_updated_at_index').on(table.updatedAt),
     check(
       'rsvps_attendance_non_negative_check',
       sql`${table.totalAttending} is null or ${table.totalAttending} >= 0`,

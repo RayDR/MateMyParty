@@ -43,6 +43,13 @@
       "when": 1785114605457,
       "tag": "0005_freezing_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785116203567,
+      "tag": "0006_smiling_sage",
+      "breakpoints": true
     }
   ]
 }

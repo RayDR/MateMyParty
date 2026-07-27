@@ -179,6 +179,8 @@ describe('host guest management screen', () => {
           totalAttending: 3,
           adultsAttending: null,
           childrenAttending: null,
+          hasDietaryNotes: true,
+          hasGuestMessage: true,
           updatedAt: '2026-07-27T01:00:00.000Z',
         },
       },
@@ -191,5 +193,9 @@ describe('host guest management screen', () => {
     expect(await screen.findByRole('dialog', { name: 'RSVP details' })).toBeInTheDocument();
     expect(screen.getByText(/No peanuts/)).toBeInTheDocument();
     expect(screen.getByText(/See you there/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Filter guests'), 'dietaryNotes');
+    expect(screen.getAllByRole('heading', { name: 'Family Sample' }).length).toBeGreaterThan(0);
+    await userEvent.selectOptions(screen.getByLabelText('Filter guests'), 'guestMessage');
+    expect(screen.getAllByRole('heading', { name: 'Family Sample' }).length).toBeGreaterThan(0);
   });
 });

@@ -51,6 +51,8 @@ export function presentInvitation(
           totalAttending: rsvp.totalAttending,
           adultsAttending: rsvp.adultsAttending,
           childrenAttending: rsvp.childrenAttending,
+          hasDietaryNotes: Boolean(rsvp.dietaryNotes),
+          hasGuestMessage: Boolean(rsvp.guestMessage),
           updatedAt: rsvp.updatedAt.toISOString(),
         }
       : null,
