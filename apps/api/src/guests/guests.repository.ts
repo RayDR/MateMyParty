@@ -4,6 +4,7 @@ import {
   events,
   guests,
   invitations,
+  rsvps,
   type DatabaseConnection,
   type DatabaseExecutor,
 } from '@matemyparty/database';
@@ -93,18 +94,20 @@ export class GuestsRepository {
       .where(and(...conditions))
       .orderBy(guests.displayName);
     return Promise.all(
-      guestRows.map(async (guest) => ({
-        guest,
-        invitation:
-          (
-            await this.connection.db
-              .select()
-              .from(invitations)
-              .where(eq(invitations.guestId, guest.id))
-              .orderBy(desc(invitations.createdAt))
-              .limit(1)
-          )[0] ?? null,
-      })),
+      guestRows.map(async (guest) => {
+        const latest = await this.connection.db
+          .select({ invitation: invitations, rsvp: rsvps })
+          .from(invitations)
+          .leftJoin(rsvps, eq(rsvps.invitationId, invitations.id))
+          .where(eq(invitations.guestId, guest.id))
+          .orderBy(desc(invitations.createdAt))
+          .limit(1);
+        return {
+          guest,
+          invitation: latest[0]?.invitation ?? null,
+          rsvp: latest[0]?.rsvp ?? null,
+        };
+      }),
     );
   }
 }

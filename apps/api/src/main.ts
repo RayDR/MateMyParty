@@ -11,7 +11,7 @@ async function bootstrap() {
   validateHostAdminConfiguration(process.env);
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ trustProxy: 'loopback' }),
+    new FastifyAdapter({ trustProxy: 'loopback', bodyLimit: 16 * 1024 }),
   );
   app.useGlobalFilters(new ApiExceptionFilter());
   app.enableShutdownHooks();

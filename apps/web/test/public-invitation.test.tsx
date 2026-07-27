@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { InvalidInvitation, PublicInvitation } from '../components/public-invitation';
 import { privateInvitation } from './public-experience-fixture';
 
@@ -25,5 +25,123 @@ describe('/i/[token] content', () => {
     expect(
       screen.getByRole('heading', { name: 'This invitation is unavailable' }),
     ).toBeInTheDocument();
+  });
+
+  it('submits a bounded RSVP through the internal same-origin route', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        status: 'ACCEPTED',
+        totalAttending: 3,
+        adultsAttending: 2,
+        childrenAttending: 1,
+        dietaryNotes: null,
+        guestMessage: 'See you there',
+        respondedAt: '2026-07-27T01:00:00.000Z',
+        updatedAt: '2026-07-27T01:00:00.000Z',
+      }),
+    );
+    render(
+      <PublicInvitation
+        invitation={privateInvitation}
+        initialLocale="en-US"
+        accessToken={'A'.repeat(43)}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Children attending'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Message for the host (optional)'), {
+      target: { value: 'See you there' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save RSVP' }));
+    expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/internal/rsvp',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'x-mmp-csrf': '1',
+          'x-invitation-token': 'A'.repeat(43),
+        }),
+      }),
+    );
+    expect(await screen.findByText('3 people confirmed')).toBeInTheDocument();
+    fetchMock.mockRestore();
+  });
+
+  it('disables RSVP mutations in host preview', () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" preview />);
+    expect(screen.getByText(/RSVP controls are disabled/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save RSVP' })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('updates an existing response and cancels confirmed attendance', async () => {
+    const current = {
+      status: 'ACCEPTED' as const,
+      totalAttending: 4,
+      adultsAttending: 2,
+      childrenAttending: 2,
+      dietaryNotes: null,
+      guestMessage: null,
+      respondedAt: '2026-07-27T01:00:00.000Z',
+      updatedAt: '2026-07-27T01:00:00.000Z',
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) =>
+      Response.json(
+        init?.method === 'DELETE'
+          ? {
+              ...current,
+              status: 'CANCELLED',
+              totalAttending: null,
+              adultsAttending: null,
+              childrenAttending: null,
+            }
+          : {
+              ...current,
+              status: 'DECLINED',
+              totalAttending: null,
+              adultsAttending: null,
+              childrenAttending: null,
+            },
+      ),
+    );
+    const { unmount } = render(
+      <PublicInvitation
+        invitation={{ ...privateInvitation, rsvp: current }}
+        initialLocale="en-US"
+        accessToken={'A'.repeat(43)}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Update response' }));
+    fireEvent.click(screen.getByLabelText("No, we can't attend"));
+    fireEvent.click(screen.getByRole('button', { name: 'Save RSVP' }));
+    expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/internal/rsvp',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+    expect(
+      JSON.parse(
+        String(fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH')?.[1]?.body),
+      ),
+    ).toMatchObject({ status: 'DECLINED' });
+
+    unmount();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(
+      <PublicInvitation
+        invitation={{ ...privateInvitation, rsvp: current }}
+        initialLocale="en-US"
+        accessToken={'A'.repeat(43)}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel attendance' }));
+    expect(await screen.findByText('Your RSVP has been saved.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/internal/rsvp',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    fetchMock.mockRestore();
   });
 });

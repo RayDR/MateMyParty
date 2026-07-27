@@ -74,7 +74,22 @@ const hostRecord: HostEventRecord = {
     localization('es-MX', 'Sexto cumpleaños de Raymundo'),
   ],
   primaryHostname: 'raymundo6th.domoforge.com',
-  statistics: { guestCount: 4, invitationCount: 3, openedCount: 2 },
+  statistics: {
+    guestCount: 4,
+    invitationCount: 3,
+    openedCount: 2,
+    rsvp: {
+      pending: 1,
+      accepted: 1,
+      declined: 1,
+      notSure: 0,
+      cancelled: 0,
+      confirmedTotal: 3,
+      confirmedAdults: 2,
+      confirmedChildren: 1,
+      invitationsWithoutResponse: 1,
+    },
+  },
   revisionNumber: 1,
 };
 

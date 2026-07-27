@@ -29,8 +29,8 @@ export class GuestsService {
   async list(eventIdentifier: string, includeArchived: boolean): Promise<HostGuest[]> {
     const eventId = await this.events.findInternalIdByIdentifier(eventIdentifier);
     if (!eventId) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
-    return (await this.guests.list(eventId, includeArchived)).map(({ guest, invitation }) =>
-      presentGuest(guest, invitation),
+    return (await this.guests.list(eventId, includeArchived)).map(({ guest, invitation, rsvp }) =>
+      presentGuest(guest, invitation, rsvp),
     );
   }
 

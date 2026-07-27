@@ -6,6 +6,7 @@ import {
   type InvitationPresentation,
   type PrivateInvitation,
   type PublicEventLanding,
+  type PublicRsvpResponse,
 } from '@matemyparty/contracts';
 import type { eventLocalizations, events } from '@matemyparty/database';
 import { getDictionary, type Locale } from '@matemyparty/i18n';
@@ -76,6 +77,8 @@ export function presentPrivateInvitation(
   },
   invitationLocale: Locale,
   openedPreviously: boolean,
+  rsvp: PublicRsvpResponse | null = null,
+  canRespond = true,
 ): PrivateInvitation {
   const localizedContent = {
     'en-US': localization(record, 'en-US'),
@@ -97,6 +100,7 @@ export function presentPrivateInvitation(
       postalCode: record.event.postalCode,
       countryCode: record.event.countryCode,
       mapsUrl: record.event.mapsUrl,
+      rsvpDeadline: record.event.rsvpDeadline?.toISOString() ?? null,
       localizedContent,
       presentation: presentInvitationPresentation(record.event),
     },
@@ -109,6 +113,7 @@ export function presentPrivateInvitation(
     },
     invitationLocale,
     openedPreviously,
+    rsvp,
     shareMetadata: {
       title: selected.title,
       description: getDictionary(invitationLocale).invitation.shareGeneric.replace(
@@ -119,7 +124,7 @@ export function presentPrivateInvitation(
       thumbnailImageRef: record.event.thumbnailImageRef,
       thumbnailAltText: selected.thumbnailAltText,
     },
-    capabilities: { canRespond: false, canAddToCalendar: false },
+    capabilities: { canRespond, canAddToCalendar: false },
   });
 }
 
@@ -140,6 +145,8 @@ export function presentHostPresentationPreview(
         childrenInvited: 2,
       },
       locale,
+      false,
+      null,
       false,
     ),
   });

@@ -140,9 +140,21 @@ function EventCard({
             />
             <Metric label={dictionary.host.openedCount} value={event.statistics.openedCount} />
           </dl>
-          <div className="mt-4 rounded-xl border border-dashed border-white/15 p-3 text-xs text-slate-400">
-            {dictionary.host.rsvpUnavailable}
-          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Metric
+              label={dictionary.host.rsvpAcceptedStat}
+              value={event.statistics.rsvp.accepted}
+            />
+            <Metric label={dictionary.host.rsvpPendingStat} value={event.statistics.rsvp.pending} />
+            <Metric
+              label={dictionary.host.rsvpDeclinedStat}
+              value={event.statistics.rsvp.declined}
+            />
+            <Metric
+              label={dictionary.host.rsvpConfirmedTotalStat}
+              value={event.statistics.rsvp.confirmedTotal}
+            />
+          </dl>
           <dl className="mt-4 space-y-1 text-sm text-slate-300">
             <div className="flex gap-2">
               <dt>{dictionary.host.template}:</dt>

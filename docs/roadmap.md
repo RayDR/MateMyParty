@@ -10,9 +10,10 @@
 - [x] Secure name-plus-contact lookup with short-lived hash-only access grants.
 - [x] Safe public landing and reusable visual invitation experience.
 - [x] Four localized presentation modes, media fallbacks, reduced motion, and protected host preview.
-- [ ] **Next milestone: RSVP responses, party sizes, and dietary notes.**
+- [x] RSVP responses, bounded attendance, dietary notes, guest messages, history, and host totals.
+- [ ] **Next milestone: maps, calendar downloads/integrations, and event sharing.**
 - [ ] Transactional email provider and delivery tracking.
-- [ ] Calendar downloads and provider integrations.
+- [ ] Calendar provider integrations beyond the next milestone's download foundation.
 - [ ] Replace temporary host access with authenticated users and event authorization.
 - [ ] Scheduled reminders and delivery preferences.
 - [ ] SMS provider behind a messaging adapter.

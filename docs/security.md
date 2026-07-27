@@ -30,6 +30,16 @@ The host sharing preview contains event-level presentation only. A raw link can 
 
 The presentation preview is protected by the same host session and API guard as event editing. It uses synthetic guest data, never accepts a real invitation credential, and never calls open tracking. Its public/private, locale, viewport, media-disabled, and reduced-motion controls are preview state only.
 
+## RSVP mutations
+
+RSVP reads and mutations require either the permanent invitation credential or an unexpired lookup grant. The permanent token is sent from the private page to a same-origin Next handler in a request header, never in an internal endpoint URL or response. Lookup grants remain HttpOnly and are read only by the server handler. Neither credential is stored in RSVP rows, history, error details, or rate-limit buckets.
+
+Cookie-backed and permanent-link mutations share the same CSRF boundary: the handler requires an exact same-host `Origin` and a custom `X-MMP-CSRF` header. Cookies are `Secure`, `HttpOnly`, and `SameSite=Strict` in production. Cross-origin API access remains disabled. Nginx returns 404 for `/api/rsvp`; only `/internal/rsvp` is public, and it forwards to the API over loopback without credential-bearing URLs.
+
+The Next handler rejects bodies larger than 8 KiB and Fastify rejects bodies larger than 16 KiB. Zod strips unknown fields and limits notes/messages. Public mutations are rate limited by an in-memory HMAC key derived from address and credential; raw inputs are not retained. Unknown, malformed, revoked, archived, or expired invitation access resolves to the same neutral invitation error.
+
+The public response contains status, attendance, notes/message, and timestamps only. It excludes UUIDs and contacts. Host detail/history endpoints require the host guard. The protected presentation preview sets `canRespond=false` and does not carry a usable credential, so it cannot create RSVP state.
+
 ## Temporary host protection
 
 `HOST_ADMIN_TOKEN` is a shared development secret, not user authentication. Nest compares it with timing-safe operations. Production startup rejects missing, short, and known example values. The web application never exposes the token to client JavaScript: its access form is handled server-side, a derived HMAC session is stored in an HttpOnly, SameSite=Strict cookie, and Next route handlers attach the API bearer token server-side.
@@ -52,7 +62,7 @@ Invitation activity can store a user agent truncated to 160 characters, one supp
 - Generate a unique high-entropy `HOST_ADMIN_TOKEN`; do not reuse the documented local value.
 - Redact invitation paths in CDN, reverse-proxy, APM, and error-reporting logs.
 - Replace the in-process lookup limiter with a shared limiter before horizontally scaling the API.
-- Add rate limits for host access attempts.
+- Add rate limits for host access attempts and replace in-process public limiters before horizontal scaling.
 - Add real authentication and event-level authorization.
 - Define token rotation, incident response, retention, and privacy policies.
 - Review CSP, CSRF posture, secure headers, dependency advisories, backup encryption, and database access controls.
@@ -60,4 +70,4 @@ Invitation activity can store a user agent truncated to 160 characters, one supp
 
 ## Current limitations
 
-There is no RSVP, delivery verification, real user authentication/authorization, tracking-cookie deduplication, bot filtering, or distributed abuse protection. Every valid private render counts as an open, including link scanners. These constraints are intentional for the milestone and must remain visible in operational decisions.
+There is no delivery verification, real user authentication/authorization, tracking-cookie deduplication, bot filtering, or distributed abuse protection. Every valid private render counts as an open, including link scanners. RSVP rate limiting is process-local. These constraints are intentional for the milestone and must remain visible in operational decisions.

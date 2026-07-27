@@ -8,6 +8,7 @@ import {
   invitationAccessGrants,
   invitationActivities,
   invitations,
+  rsvps,
   type DatabaseConnection,
   type DatabaseExecutor,
 } from '@matemyparty/database';
@@ -214,14 +215,15 @@ export class InvitationsRepository {
       .limit(1);
     const row = rows[0];
     if (!row) return null;
-    const [localizations, primaryHostname] = await Promise.all([
+    const [localizations, primaryHostname, currentRsvp] = await Promise.all([
       executor
         .select()
         .from(eventLocalizations)
         .where(eq(eventLocalizations.eventId, row.event.id)),
       this.primaryHostname(row.event.id, executor),
+      executor.select().from(rsvps).where(eq(rsvps.invitationId, invitationId)).limit(1),
     ]);
-    return { ...row, localizations, primaryHostname };
+    return { ...row, localizations, primaryHostname, rsvp: currentRsvp[0] ?? null };
   }
 
   async recordOpen(id: string, now: Date, executor: DatabaseExecutor) {

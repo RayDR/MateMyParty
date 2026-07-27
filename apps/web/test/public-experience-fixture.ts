@@ -47,6 +47,7 @@ export const privateInvitation = privateInvitationSchema.parse({
     postalCode: '75201',
     countryCode: 'US',
     mapsUrl: 'https://maps.example.test/celebration',
+    rsvpDeadline: null,
     localizedContent: {
       'en-US': {
         title: 'Raymundo’s 6th Birthday',
@@ -76,6 +77,7 @@ export const privateInvitation = privateInvitationSchema.parse({
   },
   invitationLocale: 'en-US',
   openedPreviously: false,
+  rsvp: null,
   shareMetadata: {
     title: 'Raymundo’s 6th Birthday',
     description: 'You are invited to Raymundo’s 6th Birthday.',
@@ -83,5 +85,5 @@ export const privateInvitation = privateInvitationSchema.parse({
     thumbnailImageRef: '/private-media/raymundo-6/thumbnail.webp',
     thumbnailAltText: 'Night-sky birthday illustration',
   },
-  capabilities: { canRespond: false, canAddToCalendar: false },
+  capabilities: { canRespond: true, canAddToCalendar: false },
 });

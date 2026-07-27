@@ -5,12 +5,26 @@ import type {
   GuestInvitationStatistics,
   HostEventDetail,
   HostGuest,
+  HostInvitationRsvpDetail,
+  HostRsvpStatistics,
   InvitationSharePreview,
   InvitationSummary,
+  RsvpStatus,
 } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
 
-type Filter = 'all' | 'without' | 'notOpened' | 'opened' | 'cannotNotify' | 'archived';
+type Filter =
+  | 'all'
+  | 'without'
+  | 'notOpened'
+  | 'opened'
+  | 'cannotNotify'
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'notSure'
+  | 'cancelled'
+  | 'archived';
 type InvitationResult = {
   guest?: HostGuest;
   invitation: InvitationSummary;
@@ -27,12 +41,25 @@ const emptyStatistics: GuestInvitationStatistics = {
   revoked: 0,
   notContactable: 0,
 };
+const emptyRsvpStatistics: HostRsvpStatistics = {
+  pending: 0,
+  accepted: 0,
+  declined: 0,
+  notSure: 0,
+  cancelled: 0,
+  confirmedTotal: 0,
+  confirmedAdults: 0,
+  confirmedChildren: 0,
+  invitationsWithoutResponse: 0,
+};
 
 export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string }) {
   const [locale, setLocale] = useState<Locale>('en-US');
   const [eventDetail, setEventDetail] = useState<HostEventDetail | null>(null);
   const [guests, setGuests] = useState<HostGuest[]>([]);
   const [statistics, setStatistics] = useState(emptyStatistics);
+  const [rsvpStatistics, setRsvpStatistics] = useState(emptyRsvpStatistics);
+  const [rsvpDetail, setRsvpDetail] = useState<HostInvitationRsvpDetail | null>(null);
   const [sharePreview, setSharePreview] = useState<InvitationSharePreview | null>(null);
   const [previewGuest, setPreviewGuest] = useState<HostGuest | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
@@ -50,17 +77,26 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     setLoading(true);
     try {
       const identifier = encodeURIComponent(eventIdentifier);
-      const [eventResponse, guestsResponse, statisticsResponse] = await Promise.all([
-        fetch(`/internal/host/events/${identifier}`, { cache: 'no-store' }),
-        fetch(`/internal/host/events/${identifier}/guests?includeArchived=true`, {
-          cache: 'no-store',
-        }),
-        fetch(`/internal/host/events/${identifier}/guest-statistics`, { cache: 'no-store' }),
-      ]);
-      if (!eventResponse.ok || !guestsResponse.ok || !statisticsResponse.ok) throw new Error();
+      const [eventResponse, guestsResponse, statisticsResponse, rsvpStatisticsResponse] =
+        await Promise.all([
+          fetch(`/internal/host/events/${identifier}`, { cache: 'no-store' }),
+          fetch(`/internal/host/events/${identifier}/guests?includeArchived=true`, {
+            cache: 'no-store',
+          }),
+          fetch(`/internal/host/events/${identifier}/guest-statistics`, { cache: 'no-store' }),
+          fetch(`/internal/host/events/${identifier}/rsvp-statistics`, { cache: 'no-store' }),
+        ]);
+      if (
+        !eventResponse.ok ||
+        !guestsResponse.ok ||
+        !statisticsResponse.ok ||
+        !rsvpStatisticsResponse.ok
+      )
+        throw new Error();
       setEventDetail((await eventResponse.json()) as HostEventDetail);
       setGuests((await guestsResponse.json()) as HostGuest[]);
       setStatistics((await statisticsResponse.json()) as GuestInvitationStatistics);
+      setRsvpStatistics((await rsvpStatisticsResponse.json()) as HostRsvpStatistics);
       setError(false);
     } catch {
       setError(true);
@@ -112,6 +148,12 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
         );
       if (filter === 'cannotNotify')
         return !guest.archivedAt && !guest.notificationEligibility.canNotifyAutomatically;
+      if (filter === 'pending')
+        return Boolean(guest.invitation && !guest.invitation.revokedAt && !guest.invitation.rsvp);
+      if (filter === 'accepted') return guest.invitation?.rsvp?.status === 'ACCEPTED';
+      if (filter === 'declined') return guest.invitation?.rsvp?.status === 'DECLINED';
+      if (filter === 'notSure') return guest.invitation?.rsvp?.status === 'NOT_SURE';
+      if (filter === 'cancelled') return guest.invitation?.rsvp?.status === 'CANCELLED';
       if (filter === 'archived') return Boolean(guest.archivedAt);
       return !guest.archivedAt;
     });
@@ -241,6 +283,18 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     window.setTimeout(() => setCopied(null), 1800);
   }
 
+  async function showRsvp(guest: HostGuest) {
+    if (!guest.invitation) return;
+    const response = await fetch(`/internal/host/invitations/${guest.invitation.id}/rsvp`, {
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      setError(true);
+      return;
+    }
+    setRsvpDetail((await response.json()) as HostInvitationRsvpDetail);
+  }
+
   const content = eventDetail?.localizedContent[locale];
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#312e81_0,#0f172a_38%,#020617_78%)] p-4 text-white sm:p-8">
@@ -337,6 +391,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
         ) : null}
 
         <StatisticsGrid statistics={statistics} dictionary={dictionary} />
+        <RsvpStatisticsGrid statistics={rsvpStatistics} dictionary={dictionary} />
 
         <section className="mb-5 rounded-2xl border border-white/10 bg-slate-900/75 p-4">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -362,6 +417,11 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
               <option value="notOpened">{dictionary.host.filterNotOpened}</option>
               <option value="opened">{dictionary.host.filterOpened}</option>
               <option value="cannotNotify">{dictionary.host.filterCannotNotify}</option>
+              <option value="pending">{dictionary.host.filterRsvpPending}</option>
+              <option value="accepted">{dictionary.host.filterRsvpAccepted}</option>
+              <option value="declined">{dictionary.host.filterRsvpDeclined}</option>
+              <option value="notSure">{dictionary.host.filterRsvpNotSure}</option>
+              <option value="cancelled">{dictionary.host.filterRsvpCancelled}</option>
               <option value="archived">{dictionary.host.filterArchived}</option>
             </select>
           </div>
@@ -390,6 +450,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                   onGenerate={() => void generate(guest)}
                   onCopy={() => void copy(guest.id)}
                   onPreview={() => setPreviewGuest(guest)}
+                  onRsvp={() => void showRsvp(guest)}
                   onRegenerate={() => void regenerate(guest)}
                   onRevoke={() => void revoke(guest)}
                   onArchive={() =>
@@ -417,6 +478,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
               onGenerate={(guest) => void generate(guest)}
               onCopy={(guest) => void copy(guest.id)}
               onPreview={setPreviewGuest}
+              onRsvp={(guest) => void showRsvp(guest)}
               onRegenerate={(guest) => void regenerate(guest)}
               onRevoke={(guest) => void revoke(guest)}
               onArchive={(guest) =>
@@ -444,6 +506,14 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           copied={copied === previewGuest.id}
           onCopy={() => void copy(previewGuest.id)}
           onClose={() => setPreviewGuest(null)}
+        />
+      ) : null}
+      {rsvpDetail ? (
+        <RsvpDetailModal
+          detail={rsvpDetail}
+          dictionary={dictionary}
+          locale={locale}
+          onClose={() => setRsvpDetail(null)}
         />
       ) : null}
     </main>
@@ -627,6 +697,41 @@ function StatisticsGrid({
   );
 }
 
+function RsvpStatisticsGrid({
+  statistics,
+  dictionary,
+}: {
+  statistics: HostRsvpStatistics;
+  dictionary: Dictionary;
+}) {
+  const values = [
+    [dictionary.host.rsvpPendingStat, statistics.pending],
+    [dictionary.host.rsvpAcceptedStat, statistics.accepted],
+    [dictionary.host.rsvpDeclinedStat, statistics.declined],
+    [dictionary.host.rsvpNotSureStat, statistics.notSure],
+    [dictionary.host.rsvpCancelledStat, statistics.cancelled],
+    [dictionary.host.rsvpConfirmedTotalStat, statistics.confirmedTotal],
+    [dictionary.host.rsvpConfirmedAdultsStat, statistics.confirmedAdults],
+    [dictionary.host.rsvpConfirmedChildrenStat, statistics.confirmedChildren],
+  ] as const;
+  return (
+    <section
+      aria-label={dictionary.host.rsvpSummary}
+      className="mb-5 rounded-3xl border border-cyan-300/15 bg-cyan-950/30 p-4"
+    >
+      <h2 className="mb-3 text-lg font-black text-cyan-100">{dictionary.host.rsvpSummary}</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        {values.map(([label, value]) => (
+          <div key={label} className="rounded-2xl bg-slate-950/55 p-3">
+            <p className="text-2xl font-black">{value}</p>
+            <p className="mt-1 text-xs text-slate-300">{label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 type GuestActionProps = {
   guest: HostGuest;
   dictionary: Dictionary;
@@ -636,6 +741,7 @@ type GuestActionProps = {
   onGenerate: () => void;
   onCopy: () => void;
   onPreview: () => void;
+  onRsvp: () => void;
   onRegenerate: () => void;
   onRevoke: () => void;
   onArchive: () => void;
@@ -655,6 +761,9 @@ function GuestActions(props: GuestActionProps) {
         <ActionButton primary onClick={props.onGenerate} label={dictionary.host.createInvitation} />
       ) : null}
       <ActionButton onClick={props.onPreview} label={dictionary.host.preview} />
+      {guest.invitation ? (
+        <ActionButton onClick={props.onRsvp} label={dictionary.host.rsvpDetails} />
+      ) : null}
       {props.hasLink && activeInvitation ? (
         <ActionButton
           onClick={props.onCopy}
@@ -686,6 +795,7 @@ function GuestCard(props: GuestActionProps & { locale: Locale }) {
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <ContactSummary guest={guest} dictionary={dictionary} />
         <InvitationOpeningSummary guest={guest} dictionary={dictionary} locale={locale} />
+        <RsvpSummary guest={guest} dictionary={dictionary} />
       </div>
       <div className="mt-4">
         <Eligibility guest={guest} dictionary={dictionary} />
@@ -714,6 +824,7 @@ function GuestTable({
   onGenerate: (guest: HostGuest) => void;
   onCopy: (guest: HostGuest) => void;
   onPreview: (guest: HostGuest) => void;
+  onRsvp: (guest: HostGuest) => void;
   onRegenerate: (guest: HostGuest) => void;
   onRevoke: (guest: HostGuest) => void;
   onArchive: (guest: HostGuest) => void;
@@ -730,6 +841,7 @@ function GuestTable({
             <th className="p-4">{dictionary.host.notificationEligibility}</th>
             <th className="p-4">{dictionary.host.status}</th>
             <th className="p-4">{dictionary.host.openCount}</th>
+            <th className="p-4">{dictionary.host.rsvpSummary}</th>
             <th className="p-4">{dictionary.host.actions}</th>
           </tr>
         </thead>
@@ -753,6 +865,9 @@ function GuestTable({
               <td className="p-4">
                 <InvitationOpeningSummary guest={guest} dictionary={dictionary} locale={locale} />
               </td>
+              <td className="p-4">
+                <RsvpSummary guest={guest} dictionary={dictionary} />
+              </td>
               <td className="max-w-80 p-4">
                 <GuestActions
                   guest={guest}
@@ -763,6 +878,7 @@ function GuestTable({
                   onGenerate={() => actions.onGenerate(guest)}
                   onCopy={() => actions.onCopy(guest)}
                   onPreview={() => actions.onPreview(guest)}
+                  onRsvp={() => actions.onRsvp(guest)}
                   onRegenerate={() => actions.onRegenerate(guest)}
                   onRevoke={() => actions.onRevoke(guest)}
                   onArchive={() => actions.onArchive(guest)}
@@ -833,6 +949,30 @@ function InvitationOpeningSummary({
         {dictionary.host.lastOpened}:{' '}
         {formatDate(guest.invitation.lastOpenedAt, locale, dictionary.host.never)}
       </p>
+    </div>
+  );
+}
+
+function RsvpSummary({ guest, dictionary }: { guest: HostGuest; dictionary: Dictionary }) {
+  const response = guest.invitation?.rsvp;
+  if (!guest.invitation || guest.invitation.revokedAt) {
+    return <span className="text-xs text-slate-400">{dictionary.host.rsvpNotApplicable}</span>;
+  }
+  if (!response) {
+    return (
+      <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs text-amber-100">
+        {dictionary.host.rsvpPending}
+      </span>
+    );
+  }
+  return (
+    <div className="text-xs text-slate-300">
+      <strong className="text-cyan-100">{hostRsvpStatus(response.status, dictionary)}</strong>
+      {response.status === 'ACCEPTED' ? (
+        <p className="mt-1">
+          {dictionary.host.rsvpPeople.replace('{count}', String(response.totalAttending ?? 0))}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -978,6 +1118,106 @@ function SharingPreview({
       </div>
     </div>
   );
+}
+
+function RsvpDetailModal({
+  detail,
+  dictionary,
+  locale,
+  onClose,
+}: {
+  detail: HostInvitationRsvpDetail;
+  dictionary: Dictionary;
+  locale: Locale;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={dictionary.host.rsvpDetails}
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 p-4 backdrop-blur-sm"
+    >
+      <div className="mx-auto my-8 max-w-2xl rounded-3xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+              {dictionary.host.rsvpDetails}
+            </p>
+            <h2 className="mt-1 text-2xl font-black">{detail.guestDisplayName}</h2>
+          </div>
+          <button onClick={onClose} className="rounded-xl bg-slate-700 px-4 py-2">
+            {dictionary.host.closePreview}
+          </button>
+        </div>
+        <section className="mt-5 rounded-2xl bg-white/5 p-4">
+          <h3 className="font-bold text-violet-100">{dictionary.host.rsvpCurrent}</h3>
+          {detail.current ? (
+            <RsvpSnapshot response={detail.current} dictionary={dictionary} locale={locale} />
+          ) : (
+            <p className="mt-2 text-slate-300">{dictionary.host.rsvpPending}</p>
+          )}
+        </section>
+        <section className="mt-5">
+          <h3 className="font-bold text-violet-100">{dictionary.host.rsvpHistory}</h3>
+          {detail.history.length ? (
+            <ol className="mt-3 space-y-3">
+              {detail.history.map((entry) => (
+                <li key={entry.id} className="rounded-2xl border border-white/10 p-4">
+                  <RsvpSnapshot response={entry} dictionary={dictionary} locale={locale} />
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-2 text-slate-400">{dictionary.host.rsvpNoHistory}</p>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function RsvpSnapshot({
+  response,
+  dictionary,
+  locale,
+}: {
+  response: HostInvitationRsvpDetail['current'] & object;
+  dictionary: Dictionary;
+  locale: Locale;
+}) {
+  return (
+    <div className="mt-2 space-y-1 text-sm text-slate-300">
+      <p className="font-bold text-cyan-100">{hostRsvpStatus(response.status, dictionary)}</p>
+      {response.status === 'ACCEPTED' ? (
+        <p>{dictionary.host.rsvpPeople.replace('{count}', String(response.totalAttending ?? 0))}</p>
+      ) : null}
+      {response.dietaryNotes ? (
+        <p>
+          {dictionary.host.rsvpDietary}: {response.dietaryNotes}
+        </p>
+      ) : null}
+      {response.guestMessage ? (
+        <p>
+          {dictionary.host.rsvpMessage}: {response.guestMessage}
+        </p>
+      ) : null}
+      <time className="block text-xs text-slate-500">
+        {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+          new Date(response.updatedAt),
+        )}
+      </time>
+    </div>
+  );
+}
+
+function hostRsvpStatus(status: RsvpStatus, dictionary: Dictionary) {
+  return {
+    ACCEPTED: dictionary.host.rsvpAccepted,
+    DECLINED: dictionary.host.rsvpDeclined,
+    NOT_SURE: dictionary.host.rsvpNotSure,
+    CANCELLED: dictionary.host.rsvpCancelled,
+  }[status];
 }
 
 function ActionButton({

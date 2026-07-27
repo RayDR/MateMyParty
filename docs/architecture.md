@@ -63,6 +63,16 @@ Public resolution and tracking are one database transaction. The first open uses
 
 The Next server fetches a private invitation once per render with React request memoization and no persistent fetch cache. The response contract excludes UUIDs, contacts, private notes, hashes, prefixes, and owner data.
 
+## RSVP and attendance
+
+`Rsvp` is the single current response for one invitation; the absence of a row means `PENDING`. Its explicit states are `ACCEPTED`, `DECLINED`, `NOT_SURE`, and `CANCELLED`. `RsvpHistory` stores an immutable snapshot after every meaningful create, update, or cancellation, so operational views can use the current row without losing prior answers.
+
+Attendance follows the guest's invitation count mode. `TOTAL_ONLY` accepts one positive total no larger than the invited total. `ADULTS_AND_CHILDREN` accepts bounded adult and child values and derives the total. Non-attending states clear all attendance counts. Dietary notes are limited to 500 characters and the optional guest message to 1,000 characters in Zod, the service, and PostgreSQL constraints.
+
+Public RSVP contracts contain the current answer but no invitation, guest, event, or history UUIDs and no contact data. Host-only contracts expose the invitation relationship, current response, aggregate counts, and history through bearer-protected routes. Revoked invitations and archived guests remain excluded from public access and current operational totals; their RSVP history is retained.
+
+The permanent-link experience submits its already-possessed token only in a same-origin request header. Lookup access remains an HttpOnly short-lived grant cookie. The Next boundary checks the request origin plus a custom CSRF header, caps the body at 8 KiB, and forwards credentials over loopback. Nginx does not expose the API RSVP endpoint directly.
+
 ## Public invitation experience
 
 The event root consumes `PublicEventLanding`, an allowlisted promotional contract that cannot contain schedule, location, guest, or invitation state. Lookup posts the display name and a complete email or phone to a server-side Next handler. Exact matching creates a 12-minute `InvitationAccessGrant`; only its SHA-256 hash and diagnostic prefix persist. The raw grant is placed directly into an HttpOnly cookie and is never exposed to client JavaScript or substituted for the unrecoverable permanent invitation token.
@@ -81,4 +91,4 @@ This is intentionally isolated temporary protection. Real authentication will re
 
 ## Future providers
 
-Email, SMS, object storage, calendar integrations, payments, and AI can later sit behind provider interfaces owned by their feature modules. No provider or infrastructure is installed before a use case needs it. RSVP remains the next domain milestone.
+Email, SMS, object storage, maps, calendar integrations, event sharing, payments, and AI can later sit behind provider interfaces owned by their feature modules. No provider or infrastructure is installed before a use case needs it. Maps, calendar downloads, and event sharing form the next domain milestone.
