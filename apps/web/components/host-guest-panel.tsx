@@ -282,6 +282,12 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href={`/host/events/${encodeURIComponent(eventIdentifier)}/preview`}
+                  className="rounded-xl bg-white/10 px-4 py-2.5 font-bold"
+                >
+                  {dictionary.host.previewInvitation}
+                </a>
                 <button
                   type="button"
                   onClick={showForm ? () => setShowForm(false) : beginCreate}

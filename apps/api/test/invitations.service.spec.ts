@@ -1,4 +1,11 @@
-import type { DatabaseExecutor, events, guests, invitations } from '@matemyparty/database';
+import type {
+  DatabaseExecutor,
+  eventLocalizations,
+  events,
+  guests,
+  invitationAccessGrants,
+  invitations,
+} from '@matemyparty/database';
 import { ApiError } from '../src/common/api-error';
 import { InvitationTokenService } from '../src/invitations/invitation-token.service';
 import type { InvitationsRepository } from '../src/invitations/invitations.repository';
@@ -8,6 +15,8 @@ import { PublicInvitationUrlService } from '../src/invitations/public-invitation
 type GuestRow = typeof guests.$inferSelect;
 type InvitationRow = typeof invitations.$inferSelect;
 type EventRow = typeof events.$inferSelect;
+type LocalizationRow = typeof eventLocalizations.$inferSelect;
+type GrantRow = typeof invitationAccessGrants.$inferSelect;
 
 const guest: GuestRow = {
   id: '55555555-5555-4555-8555-555555555555',
@@ -65,10 +74,39 @@ const event: EventRow = {
   createdAt: new Date(),
   updatedAt: new Date(),
 };
+const localizations: LocalizationRow[] = [
+  {
+    id: '88888888-8888-4888-8888-888888888881',
+    eventId: event.id,
+    locale: 'en-US',
+    title: 'Raymundo’s 6th Birthday',
+    celebrantName: 'Raymundo',
+    venueName: 'Celebration Center',
+    hostMessage: null,
+    arrivalInstructions: null,
+    thumbnailAltText: 'Birthday illustration',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: '88888888-8888-4888-8888-888888888882',
+    eventId: event.id,
+    locale: 'es-MX',
+    title: 'Sexto cumpleaños de Raymundo',
+    celebrantName: 'Raymundo',
+    venueName: 'Centro de celebraciones',
+    hostMessage: null,
+    arrivalInstructions: null,
+    thumbnailAltText: 'Ilustración de cumpleaños',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
 
 class MemoryInvitationsRepository {
   invitations: InvitationRow[] = [];
   activities: Array<{ invitationId: string; type: string }> = [];
+  grants: GrantRow[] = [];
   guestArchived = false;
   sequence = 0;
   executor = {} as DatabaseExecutor;
@@ -116,6 +154,12 @@ class MemoryInvitationsRepository {
     row.revokedAt = new Date();
     return row;
   }
+  async revokeAccessGrants(invitationId: string) {
+    const now = new Date();
+    for (const grant of this.grants) {
+      if (grant.invitationId === invitationId && !grant.revokedAt) grant.revokedAt = now;
+    }
+  }
   async primaryHostname() {
     return 'raymundo6th.domoforge.com';
   }
@@ -125,10 +169,39 @@ class MemoryInvitationsRepository {
       (value) => value.publicTokenPrefix === prefix && !value.revokedAt,
     );
   }
+  async accessGrantCandidates(prefix: string, now: Date) {
+    if (this.guestArchived) return [];
+    return this.grants
+      .filter(
+        (grant) => grant.grantTokenPrefix === prefix && !grant.revokedAt && grant.expiresAt > now,
+      )
+      .flatMap((grant) => {
+        const invitation = this.invitations.find(
+          (candidate) => candidate.id === grant.invitationId && !candidate.revokedAt,
+        );
+        return invitation ? [{ grant, invitation }] : [];
+      });
+  }
+  async markAccessGrantUsed(id: string, now: Date) {
+    const grant = this.grants.find(
+      (candidate) => candidate.id === id && !candidate.revokedAt && candidate.expiresAt > now,
+    );
+    if (!grant) return false;
+    grant.lastUsedAt = now;
+    return true;
+  }
   async publicDetails(id: string) {
     if (this.guestArchived) return null;
     const invitation = await this.findById(id);
-    return invitation ? { invitation, guest, event, localization: null } : null;
+    return invitation
+      ? {
+          invitation,
+          guest,
+          event,
+          localizations,
+          primaryHostname: 'raymundo6th.domoforge.com',
+        }
+      : null;
   }
   async recordOpen(id: string, now: Date) {
     const row = await this.findById(id);
@@ -193,6 +266,72 @@ describe('InvitationsService lifecycle', () => {
     expect(repository.invitations[0]!.firstOpenedAt).toEqual(firstOpenedAt);
     expect(repository.invitations[0]!.lastOpenedAt).toBeInstanceOf(Date);
     expect(repository.invitations[0]!.openCount).toBe(2);
+  });
+
+  it('renders through a short-lived grant and records the open only when rendered', async () => {
+    const { repository, service, tokens } = setup();
+    const created = await service.createForGuest(guest.id);
+    const generated = tokens.generate();
+    repository.grants.push({
+      id: '99999999-9999-4999-8999-999999999999',
+      invitationId: created.invitation.id,
+      grantTokenHash: generated.hash,
+      grantTokenPrefix: generated.prefix,
+      lookupMethod: 'EMAIL',
+      expiresAt: new Date(Date.now() + 60_000),
+      lastUsedAt: null,
+      createdAt: new Date(),
+      revokedAt: null,
+    });
+    expect(repository.invitations[0]!.openCount).toBe(0);
+    await expect(service.resolveGrantAndTrack(generated.token, {})).resolves.toMatchObject({
+      guestDisplayName: 'Family Sample',
+    });
+    expect(repository.invitations[0]!.openCount).toBe(1);
+    expect(repository.grants[0]!.lastUsedAt).toBeInstanceOf(Date);
+  });
+
+  it.each(['expired', 'revoked'] as const)('rejects a %s access grant neutrally', async (state) => {
+    const { repository, service, tokens } = setup();
+    const created = await service.createForGuest(guest.id);
+    const generated = tokens.generate();
+    repository.grants.push({
+      id: '99999999-9999-4999-8999-999999999999',
+      invitationId: created.invitation.id,
+      grantTokenHash: generated.hash,
+      grantTokenPrefix: generated.prefix,
+      lookupMethod: 'PHONE',
+      expiresAt: new Date(Date.now() + (state === 'expired' ? -60_000 : 60_000)),
+      lastUsedAt: null,
+      createdAt: new Date(),
+      revokedAt: state === 'revoked' ? new Date() : null,
+    });
+    await expect(service.resolveGrantAndTrack(generated.token, {})).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(repository.invitations[0]!.openCount).toBe(0);
+  });
+
+  it('invalidates related grants when the invitation is revoked', async () => {
+    const { repository, service, tokens } = setup();
+    const created = await service.createForGuest(guest.id);
+    const generated = tokens.generate();
+    repository.grants.push({
+      id: '99999999-9999-4999-8999-999999999999',
+      invitationId: created.invitation.id,
+      grantTokenHash: generated.hash,
+      grantTokenPrefix: generated.prefix,
+      lookupMethod: 'EMAIL',
+      expiresAt: new Date(Date.now() + 60_000),
+      lastUsedAt: null,
+      createdAt: new Date(),
+      revokedAt: null,
+    });
+    await service.revoke(created.invitation.id);
+    expect(repository.grants[0]!.revokedAt).toBeInstanceOf(Date);
+    await expect(service.resolveGrantAndTrack(generated.token, {})).rejects.toMatchObject({
+      status: 404,
+    });
   });
 
   it('uses the same public 404 for unknown and revoked tokens', async () => {

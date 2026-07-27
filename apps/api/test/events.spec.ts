@@ -7,7 +7,7 @@ import { EventsService } from '../src/events/events.service';
 type EventRow = typeof events.$inferSelect;
 type LocalizationRow = typeof eventLocalizations.$inferSelect;
 
-const publicRow = {
+const publicEventFields = {
   title: 'Raymundo’s 6th Birthday',
   celebrantName: 'Raymundo',
   celebrantAge: 6,
@@ -34,7 +34,7 @@ const publicRow = {
 const event: EventRow = {
   id: '22222222-2222-4222-8222-222222222222',
   ownerUserId: '11111111-1111-4111-8111-111111111111',
-  ...publicRow,
+  ...publicEventFields,
   publicCode: 'SQ52LQE9',
   animationMode: 'IMMERSIVE',
   videoBackgroundRef: '/private-media/raymundo-6/dragons-intro.mp4',
@@ -76,6 +76,12 @@ const hostRecord: HostEventRecord = {
   primaryHostname: 'raymundo6th.domoforge.com',
   statistics: { guestCount: 4, invitationCount: 3, openedCount: 2 },
   revisionNumber: 1,
+};
+
+const publicRow = {
+  event,
+  localizations: hostRecord.localizations,
+  primaryHostname: hostRecord.primaryHostname,
 };
 
 const update: UpdateHostEventInput = {
@@ -142,6 +148,9 @@ describe('EventsService', () => {
     expect(received).toBe('raymundo6th.domoforge.com');
     expect(result.publicSlug).toBe('raymundo-6');
     expect(result).not.toHaveProperty('id');
+    expect(result).not.toHaveProperty('startsAt');
+    expect(result).not.toHaveProperty('venueName');
+    expect(JSON.stringify(result)).not.toContain('Kids Empire Dallas Hillcrest');
   });
 
   it('returns 404 semantics for an unknown hostname', async () => {
@@ -183,6 +192,19 @@ describe('EventsService', () => {
     expect(preview.smsText).toContain('https://raymundo6th.domoforge.com/i/…');
     expect(preview).not.toHaveProperty('guest');
     expect(preview).not.toHaveProperty('email');
+  });
+
+  it('builds protected presentation preview without recording an invitation open', async () => {
+    const findHostRecordByIdentifier = jest.fn().mockResolvedValue(hostRecord);
+    const recordOpen = jest.fn();
+    const repository = {
+      findHostRecordByIdentifier,
+      recordOpen,
+    } as unknown as EventsRepository;
+    const preview = await new EventsService(repository).presentationPreview('raymundo-6', 'es-MX');
+    expect(preview.invitation.invitationLocale).toBe('es-MX');
+    expect(preview.landing).not.toHaveProperty('startsAt');
+    expect(recordOpen).not.toHaveBeenCalled();
   });
 
   it('builds dashboard statistics without exposing UUIDs', async () => {

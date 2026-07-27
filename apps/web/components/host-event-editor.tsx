@@ -125,6 +125,12 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
           </div>
           <div className="flex items-center gap-2">
             <a
+              href={`/host/events/${encodeURIComponent(identifier)}/preview`}
+              className="rounded-xl bg-violet-500 px-3 py-2 text-sm font-bold"
+            >
+              {dictionary.host.previewInvitation}
+            </a>
+            <a
               href={`/host/events/${encodeURIComponent(identifier)}/guests`}
               className="hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-bold sm:block"
             >

@@ -5,27 +5,30 @@ import {
   invitationSharePreviewSchema,
   normalizeHostname,
   normalizeSlug,
-  publicEventSchema,
   updateHostEventInputSchema,
+  type HostPresentationPreview,
   type HostEventDetail,
   type HostEventSummary,
   type InvitationSharePreview,
-  type PublicEvent,
+  type PublicEventLanding,
 } from '@matemyparty/contracts';
 import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { ApiError, parseInput } from '../common/api-error';
 import { EventsRepository, type HostEventRecord } from './events.repository';
+import { presentHostPresentationPreview, presentPublicLanding } from './presentation.presenter';
 
 @Injectable()
 export class EventsService {
   constructor(private readonly repository: EventsRepository) {}
 
-  async byHostname(rawHostname: string): Promise<PublicEvent> {
-    return this.toPublicEvent(await this.repository.findByHostname(normalizeHostname(rawHostname)));
+  async byHostname(rawHostname: string): Promise<PublicEventLanding> {
+    return this.toPublicLanding(
+      await this.repository.findByHostname(normalizeHostname(rawHostname)),
+    );
   }
 
-  async bySlug(rawSlug: string): Promise<PublicEvent> {
-    return this.toPublicEvent(await this.repository.findBySlug(normalizeSlug(rawSlug)));
+  async bySlug(rawSlug: string): Promise<PublicEventLanding> {
+    return this.toPublicLanding(await this.repository.findBySlug(normalizeSlug(rawSlug)));
   }
 
   async listHostEvents(): Promise<HostEventSummary[]> {
@@ -64,6 +67,18 @@ export class EventsService {
     });
   }
 
+  async presentationPreview(
+    identifier: string,
+    requestedLocale?: string,
+  ): Promise<HostPresentationPreview> {
+    const record = await this.repository.findHostRecordByIdentifier(identifier);
+    if (!record) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
+    const defaultLocale: Locale = record.event.locale === 'es-MX' ? 'es-MX' : 'en-US';
+    const locale: Locale =
+      requestedLocale === 'en-US' || requestedLocale === 'es-MX' ? requestedLocale : defaultLocale;
+    return presentHostPresentationPreview(record, locale);
+  }
+
   async updateHostEvent(identifier: string, rawInput: unknown): Promise<HostEventDetail> {
     const input = parseInput(updateHostEventInputSchema, rawInput);
     return this.repository.transaction(async (executor) => {
@@ -89,14 +104,11 @@ export class EventsService {
     });
   }
 
-  private toPublicEvent(row: Awaited<ReturnType<EventsRepository['findBySlug']>>): PublicEvent {
+  private toPublicLanding(
+    row: Awaited<ReturnType<EventsRepository['findBySlug']>>,
+  ): PublicEventLanding {
     if (!row) throw new NotFoundException('Event not found');
-    return publicEventSchema.parse({
-      ...row,
-      startsAt: row.startsAt.toISOString(),
-      endsAt: row.endsAt?.toISOString() ?? null,
-      rsvpDeadline: row.rsvpDeadline?.toISOString() ?? null,
-    });
+    return presentPublicLanding(row);
   }
 
   private toHostSummary(record: HostEventRecord): HostEventSummary {

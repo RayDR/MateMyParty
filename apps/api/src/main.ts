@@ -9,9 +9,11 @@ import { ApiExceptionFilter } from './common/api-exception.filter';
 async function bootstrap() {
   const environment = parseEnvironment(process.env);
   validateHostAdminConfiguration(process.env);
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({ trustProxy: 'loopback' }),
+  );
   app.useGlobalFilters(new ApiExceptionFilter());
-  app.enableCors();
   app.enableShutdownHooks();
   await app.listen(environment.API_PORT, environment.API_HOST);
 }

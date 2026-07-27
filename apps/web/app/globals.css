@@ -7,3 +7,130 @@ body {
   margin: 0;
   min-height: 100vh;
 }
+
+.celebration-flight::before,
+.celebration-flight::after {
+  position: absolute;
+  content: '';
+  width: 16rem;
+  height: 5rem;
+  border-radius: 100%;
+  background: radial-gradient(ellipse, rgb(103 232 249 / 35%), transparent 68%);
+  filter: blur(2px);
+  animation: night-flight 11s ease-in-out infinite;
+}
+
+.celebration-flight::after {
+  animation-delay: -5s;
+  animation-duration: 14s;
+  opacity: 0.55;
+}
+
+.celebration-gates::before,
+.celebration-gates::after {
+  position: absolute;
+  inset-block: 0;
+  width: 28%;
+  content: '';
+  border: 1px solid rgb(253 230 138 / 25%);
+  background: linear-gradient(90deg, rgb(15 23 42 / 85%), rgb(88 28 135 / 35%));
+  box-shadow: 0 0 5rem rgb(217 70 239 / 22%);
+  animation: gate-reveal 2.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.celebration-gates::before {
+  left: 0;
+  transform-origin: left;
+}
+
+.celebration-gates::after {
+  right: 0;
+  transform-origin: right;
+}
+
+.celebration-envelope::before {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: min(70vw, 34rem);
+  aspect-ratio: 16 / 10;
+  content: '';
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 1.5rem;
+  background: linear-gradient(145deg, rgb(244 114 182 / 18%), rgb(99 102 241 / 18%));
+  box-shadow: 0 2rem 6rem rgb(76 29 149 / 35%);
+  animation: envelope-reveal 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.celebration-snow {
+  background-image:
+    radial-gradient(circle, rgb(255 255 255 / 70%) 0 2px, transparent 3px),
+    radial-gradient(circle, rgb(186 230 253 / 55%) 0 1px, transparent 2px);
+  background-position:
+    0 0,
+    3rem 5rem;
+  background-size:
+    7rem 7rem,
+    5rem 5rem;
+  animation: winter-snow 13s linear infinite;
+}
+
+@keyframes night-flight {
+  0% {
+    transform: translate(-25vw, 70vh) rotate(-8deg) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  75% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(115vw, 12vh) rotate(6deg) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes gate-reveal {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.12);
+  }
+}
+
+@keyframes envelope-reveal {
+  from {
+    transform: translate(-50%, 38vh) rotateX(68deg) scale(0.72);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0) rotateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes winter-snow {
+  from {
+    background-position:
+      0 -7rem,
+      3rem -5rem;
+  }
+  to {
+    background-position:
+      2rem 7rem,
+      0 5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-flight,
+  .celebration-gates,
+  .celebration-envelope,
+  .celebration-snow,
+  .invitation-motion-video {
+    display: none;
+  }
+}

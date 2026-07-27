@@ -9,6 +9,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
   if (request.nextUrl.pathname.startsWith('/i/')) return NextResponse.next();
+  if (request.nextUrl.pathname === '/invitation') return NextResponse.next();
   if (
     request.nextUrl.pathname.startsWith('/host/') ||
     request.nextUrl.pathname.startsWith('/internal/')

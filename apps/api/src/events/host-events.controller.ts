@@ -22,6 +22,11 @@ export class HostEventsController {
     return this.events.invitationSharePreview(identifier, locale);
   }
 
+  @Get(':identifier/presentation-preview')
+  presentationPreview(@Param('identifier') identifier: string, @Query('locale') locale?: string) {
+    return this.events.presentationPreview(identifier, locale);
+  }
+
   @Patch(':identifier')
   update(@Param('identifier') identifier: string, @Body() body: unknown) {
     return this.events.updateHostEvent(identifier, body);

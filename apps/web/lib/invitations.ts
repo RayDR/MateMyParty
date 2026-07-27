@@ -1,9 +1,9 @@
 import { cache } from 'react';
-import { publicInvitationSchema, type PublicInvitation } from '@matemyparty/contracts';
+import { privateInvitationSchema, type PrivateInvitation } from '@matemyparty/contracts';
 import { internalApiBaseUrl } from './server-api';
 
 export const getPublicInvitation = cache(
-  async (token: string): Promise<PublicInvitation | null> => {
+  async (token: string): Promise<PrivateInvitation | null> => {
     const response = await fetch(
       `${internalApiBaseUrl}/api/invitations/${encodeURIComponent(token)}`,
       {
@@ -14,6 +14,22 @@ export const getPublicInvitation = cache(
     if (response.status === 404) return null;
     if (!response.ok)
       throw new Error(`Invitation API request failed with status ${response.status}`);
-    return publicInvitationSchema.parse(await response.json());
+    return privateInvitationSchema.parse(await response.json());
+  },
+);
+
+export const getGrantInvitation = cache(
+  async (grantToken: string): Promise<PrivateInvitation | null> => {
+    const response = await fetch(`${internalApiBaseUrl}/api/invitations/access`, {
+      cache: 'no-store',
+      headers: {
+        'user-agent': 'MateMyParty web server',
+        'x-invitation-grant': grantToken,
+      },
+    });
+    if (response.status === 404) return null;
+    if (!response.ok)
+      throw new Error(`Invitation API request failed with status ${response.status}`);
+    return privateInvitationSchema.parse(await response.json());
   },
 );

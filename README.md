@@ -1,6 +1,6 @@
 # MateMyParty
 
-MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone preserves Raymundo's sixth birthday as a generic event and adds guest management, secure individual invitation links, a temporary host panel, and initial open tracking.
+MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone adds a privacy-safe themed public landing, exact name-plus-contact invitation lookup, short-lived hash-only access grants, reusable media-aware presentation modes, and protected host preview while preserving secure direct links and guest management.
 
 ## Architecture
 
@@ -52,11 +52,15 @@ pnpm dev
 
 Open `http://localhost:3000` for the product landing and `http://localhost:3000/events/raymundo-6` for the seeded event. The API is at `http://localhost:3001`; health is `GET /health`.
 
+The public event route exposes promotional content only. Use the lookup form with a registered display name plus the complete email or phone; successful verification stores a 12-minute HttpOnly access grant and continues to `/invitation`. Existing permanent links remain available at `/i/{token}`. Neither private route is cached or indexed.
+
 The temporary host panel for the seeded event uses its public slug (the random public code also works):
 
 ```text
 http://localhost:3000/host/events/raymundo-6/guests
 ```
+
+The protected presentation preview is at `http://localhost:3000/host/events/raymundo-6/preview`. It uses synthetic invitation data and supports public/private, language, viewport, media-disabled, and reduced-motion views without recording opens.
 
 Enter `HOST_ADMIN_TOKEN` at the access screen. The server validates it and sets a derived HttpOnly, SameSite=Strict session cookie; browser JavaScript never receives the API secret. This mechanism is provisional and must be replaced by real user authentication and event authorization.
 
@@ -71,7 +75,7 @@ For a browser, add `127.0.0.1 raymundo6th.domoforge.com matemyparty.domoforge.co
 
 ## Database workflow
 
-`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle and `0003_regular_the_order.sql` for explicit total-only or adult/child invitation counts. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
+`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, and `0004_wooden_silver_sable.sql` for short-lived invitation access grants. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
 
 Optional non-personal sample guests are inserted only when explicitly requested:
 
@@ -135,7 +139,7 @@ pnpm docker:down
 
 ## Tests
 
-Contracts and frontend components use Vitest. The Nest API uses Jest. Run all suites with `pnpm test`; coverage includes guest semantics, token generation and hashing, host protection, invitation opening/regeneration/revocation, public DTO privacy, translation parity, personalized invitation rendering, and the host panel in addition to the original foundation.
+Contracts and frontend components use Vitest. The Nest API uses Jest. Run all suites with `pnpm test`; coverage includes public DTO privacy, exact lookup normalization and generic failures, grant hashing/expiration/revocation, rate limiting, open tracking, locale priority, private metadata, media fallbacks, reduced motion, presentation modes, and protected preview in addition to guest and host workflows.
 
 See [docs/security.md](docs/security.md) before exposing any environment publicly.
 

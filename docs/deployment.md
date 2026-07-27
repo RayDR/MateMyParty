@@ -197,7 +197,7 @@ curl --fail --resolve raymundo6th.domoforge.com:80:127.0.0.1 \
   http://raymundo6th.domoforge.com/
 ```
 
-Both Nginx files suppress access-log entries whose path begins with `/i/`; error logging remains enabled. The TLS configuration also sends `no-store` for invitation and host routes. `/api/*` and `/health` go to Nest, `/internal/*` stays on Next, and `/ws/*` is reserved without claiming a websocket implementation.
+Both Nginx files suppress access-log entries whose path begins with `/i/`; error logging remains enabled. The TLS configuration also sends `no-store` for invitation and host routes. `/health` and non-invitation `/api/*` routes go to Nest, while `/api/invitations/*` is deliberately unavailable through the public proxy so credential-bearing resolution and lookup traffic can use only the loopback Next-to-API path. `/internal/*` stays on Next, and `/ws/*` is reserved without claiming a websocket implementation. Next applies `noindex`, `no-store`, and `no-referrer` headers to both `/i/*` and the verified `/invitation` session route.
 
 ## 8. TLS after DNS is correct
 
