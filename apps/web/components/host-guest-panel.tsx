@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
+  EmailPreview,
+  EventEmailStatistics,
   GuestInvitationStatistics,
   HostEventDetail,
   HostGuest,
@@ -9,6 +11,8 @@ import type {
   HostRsvpStatistics,
   InvitationSharePreview,
   InvitationSummary,
+  SendInvitationEmailResult,
+  SendTestEmailResult,
   RsvpStatus,
 } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
@@ -54,6 +58,16 @@ const emptyRsvpStatistics: HostRsvpStatistics = {
   confirmedChildren: 0,
   invitationsWithoutResponse: 0,
 };
+const emptyEmailStatistics: EventEmailStatistics = {
+  eligibleGuests: 0,
+  ineligibleGuests: 0,
+  queued: 0,
+  sending: 0,
+  sent: 0,
+  delivered: 0,
+  failed: 0,
+  cancelled: 0,
+};
 
 export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string }) {
   const [locale, setLocale] = useState<Locale>('en-US');
@@ -61,6 +75,10 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
   const [guests, setGuests] = useState<HostGuest[]>([]);
   const [statistics, setStatistics] = useState(emptyStatistics);
   const [rsvpStatistics, setRsvpStatistics] = useState(emptyRsvpStatistics);
+  const [emailStatistics, setEmailStatistics] = useState(emptyEmailStatistics);
+  const [emailPreview, setEmailPreview] = useState<EmailPreview | null>(null);
+  const [emailPreviewGuest, setEmailPreviewGuest] = useState<HostGuest | null>(null);
+  const [emailBusy, setEmailBusy] = useState<string | null>(null);
   const [rsvpDetail, setRsvpDetail] = useState<HostInvitationRsvpDetail | null>(null);
   const [sharePreview, setSharePreview] = useState<InvitationSharePreview | null>(null);
   const [previewGuest, setPreviewGuest] = useState<HostGuest | null>(null);
@@ -79,26 +97,34 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     setLoading(true);
     try {
       const identifier = encodeURIComponent(eventIdentifier);
-      const [eventResponse, guestsResponse, statisticsResponse, rsvpStatisticsResponse] =
-        await Promise.all([
-          fetch(`/internal/host/events/${identifier}`, { cache: 'no-store' }),
-          fetch(`/internal/host/events/${identifier}/guests?includeArchived=true`, {
-            cache: 'no-store',
-          }),
-          fetch(`/internal/host/events/${identifier}/guest-statistics`, { cache: 'no-store' }),
-          fetch(`/internal/host/events/${identifier}/rsvp-statistics`, { cache: 'no-store' }),
-        ]);
+      const [
+        eventResponse,
+        guestsResponse,
+        statisticsResponse,
+        rsvpStatisticsResponse,
+        emailStatisticsResponse,
+      ] = await Promise.all([
+        fetch(`/internal/host/events/${identifier}`, { cache: 'no-store' }),
+        fetch(`/internal/host/events/${identifier}/guests?includeArchived=true`, {
+          cache: 'no-store',
+        }),
+        fetch(`/internal/host/events/${identifier}/guest-statistics`, { cache: 'no-store' }),
+        fetch(`/internal/host/events/${identifier}/rsvp-statistics`, { cache: 'no-store' }),
+        fetch(`/internal/host/events/${identifier}/email/statistics`, { cache: 'no-store' }),
+      ]);
       if (
         !eventResponse.ok ||
         !guestsResponse.ok ||
         !statisticsResponse.ok ||
-        !rsvpStatisticsResponse.ok
+        !rsvpStatisticsResponse.ok ||
+        !emailStatisticsResponse.ok
       )
         throw new Error();
       setEventDetail((await eventResponse.json()) as HostEventDetail);
       setGuests((await guestsResponse.json()) as HostGuest[]);
       setStatistics((await statisticsResponse.json()) as GuestInvitationStatistics);
       setRsvpStatistics((await rsvpStatisticsResponse.json()) as HostRsvpStatistics);
+      setEmailStatistics((await emailStatisticsResponse.json()) as EventEmailStatistics);
       setError(false);
     } catch {
       setError(true);
@@ -232,6 +258,51 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     }
     setError(false);
     return response.json() as Promise<unknown>;
+  }
+
+  async function showEmailPreview(guest: HostGuest) {
+    setEmailPreviewGuest(guest);
+    setEmailPreview(null);
+    const response = await fetch(
+      `/internal/host/guests/${guest.id}/email/preview?locale=${encodeURIComponent(guest.locale)}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) {
+      setEmailPreviewGuest(null);
+      setError(true);
+      return;
+    }
+    setEmailPreview((await response.json()) as EmailPreview);
+  }
+
+  async function sendEmail(guest: HostGuest) {
+    const delivery = guest.emailDelivery;
+    if (!delivery?.eligibility.eligible) return;
+    const regenerate = delivery.eligibility.requiresRegeneration;
+    if (regenerate && !window.confirm(dictionary.host.confirmEmailRegeneration)) return;
+    setEmailBusy(guest.id);
+    try {
+      const response = await fetch(`/internal/host/guests/${guest.id}/email/send`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mmp-csrf': '1' },
+        body: JSON.stringify({
+          idempotencyKey: crypto.randomUUID(),
+          regenerate,
+          overridePreferredChannel: false,
+        }),
+      });
+      if (!response.ok) throw new Error();
+      const result = (await response.json()) as SendInvitationEmailResult;
+      if (result.publicUrl) {
+        setLinks((current) => ({ ...current, [guest.id]: result.publicUrl! }));
+      }
+      if (result.attempt.status === 'FAILED') setError(true);
+      await load();
+    } catch {
+      setError(true);
+    } finally {
+      setEmailBusy(null);
+    }
   }
 
   async function generate(guest: HostGuest) {
@@ -396,6 +467,12 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
 
         <StatisticsGrid statistics={statistics} dictionary={dictionary} />
         <RsvpStatisticsGrid statistics={rsvpStatistics} dictionary={dictionary} />
+        <EmailDeliveryPanel
+          statistics={emailStatistics}
+          eventIdentifier={eventIdentifier}
+          locale={locale}
+          dictionary={dictionary}
+        />
 
         <section className="mb-5 rounded-2xl border border-white/10 bg-slate-900/75 p-4">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -471,6 +548,9 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                       dictionary.host.confirmRestore,
                     )
                   }
+                  onEmailPreview={() => void showEmailPreview(guest)}
+                  onEmailSend={() => void sendEmail(guest)}
+                  emailBusy={emailBusy === guest.id}
                 />
               ))}
             </div>
@@ -499,6 +579,9 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                   dictionary.host.confirmRestore,
                 )
               }
+              onEmailPreview={(guest) => void showEmailPreview(guest)}
+              onEmailSend={(guest) => void sendEmail(guest)}
+              emailBusy={emailBusy}
             />
           </>
         )}
@@ -520,6 +603,17 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           dictionary={dictionary}
           locale={locale}
           onClose={() => setRsvpDetail(null)}
+        />
+      ) : null}
+      {emailPreviewGuest ? (
+        <EmailPreviewModal
+          guest={emailPreviewGuest}
+          preview={emailPreview}
+          dictionary={dictionary}
+          onClose={() => {
+            setEmailPreviewGuest(null);
+            setEmailPreview(null);
+          }}
         />
       ) : null}
     </main>
@@ -738,6 +832,105 @@ function RsvpStatisticsGrid({
   );
 }
 
+function EmailDeliveryPanel({
+  statistics,
+  eventIdentifier,
+  locale,
+  dictionary,
+}: {
+  statistics: EventEmailStatistics;
+  eventIdentifier: string;
+  locale: Locale;
+  dictionary: Dictionary;
+}) {
+  const [result, setResult] = useState<SendTestEmailResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function sendTest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setResult(null);
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await fetch(
+        `/internal/host/events/${encodeURIComponent(eventIdentifier)}/email/test`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-mmp-csrf': '1' },
+          body: JSON.stringify({ email: String(form.get('testEmail') ?? ''), locale }),
+        },
+      );
+      const body = (await response.json()) as SendTestEmailResult;
+      setResult(
+        response.ok
+          ? body
+          : {
+              accepted: false,
+              providerStatus: 'REJECTED',
+              safeErrorCode: null,
+              safeErrorMessage: dictionary.host.testEmailFailed,
+            },
+      );
+    } catch {
+      setResult({
+        accepted: false,
+        providerStatus: 'FAILED',
+        safeErrorCode: null,
+        safeErrorMessage: dictionary.host.testEmailFailed,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="mb-5 rounded-3xl border border-violet-300/15 bg-violet-950/25 p-4">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h2 className="text-lg font-black text-violet-100">{dictionary.host.emailDelivery}</h2>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <EmailCount label={dictionary.host.emailEligible} value={statistics.eligibleGuests} />
+            <EmailCount label={dictionary.host.emailSent} value={statistics.sent} />
+            <EmailCount label={dictionary.host.emailDelivered} value={statistics.delivered} />
+            <EmailCount label={dictionary.host.emailFailed} value={statistics.failed} />
+          </div>
+        </div>
+        <form onSubmit={sendTest} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="text-xs text-slate-300">
+            {dictionary.host.testEmailDestination}
+            <input
+              name="testEmail"
+              type="email"
+              required
+              autoComplete="email"
+              className="mt-1 block rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+            />
+          </label>
+          <button
+            disabled={busy}
+            className="rounded-xl bg-violet-600 px-4 py-2 font-bold disabled:opacity-60"
+          >
+            {busy ? dictionary.host.sendingEmail : dictionary.host.sendTestEmail}
+          </button>
+        </form>
+      </div>
+      {result ? (
+        <p className={`mt-3 text-sm ${result.accepted ? 'text-emerald-200' : 'text-red-200'}`}>
+          {result.accepted
+            ? dictionary.host.testEmailAccepted
+            : (result.safeErrorMessage ?? dictionary.host.testEmailFailed)}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function EmailCount({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="rounded-full bg-slate-950/60 px-3 py-1">
+      {label}: {value}
+    </span>
+  );
+}
+
 type GuestActionProps = {
   guest: HostGuest;
   dictionary: Dictionary;
@@ -752,6 +945,9 @@ type GuestActionProps = {
   onRevoke: () => void;
   onArchive: () => void;
   onRestore: () => void;
+  onEmailPreview: () => void;
+  onEmailSend: () => void;
+  emailBusy: boolean;
 };
 
 function GuestActions(props: GuestActionProps) {
@@ -763,6 +959,21 @@ function GuestActions(props: GuestActionProps) {
   return (
     <div className="flex flex-wrap gap-2">
       <ActionButton onClick={props.onEdit} label={dictionary.host.edit} />
+      <ActionButton onClick={props.onEmailPreview} label={dictionary.host.previewEmail} />
+      {guest.emailDelivery?.eligibility.eligible ? (
+        <ActionButton
+          primary
+          disabled={props.emailBusy}
+          onClick={props.onEmailSend}
+          label={
+            props.emailBusy
+              ? dictionary.host.sendingEmail
+              : guest.emailDelivery.eligibility.action === 'REGENERATE_AND_SEND'
+                ? dictionary.host.regenerateAndSendEmail
+                : dictionary.host.generateAndSendEmail
+          }
+        />
+      ) : null}
       {!guest.invitation ? (
         <ActionButton primary onClick={props.onGenerate} label={dictionary.host.createInvitation} />
       ) : null}
@@ -804,7 +1015,7 @@ function GuestCard(props: GuestActionProps & { locale: Locale }) {
         <RsvpSummary guest={guest} dictionary={dictionary} locale={locale} />
       </div>
       <div className="mt-4">
-        <Eligibility guest={guest} dictionary={dictionary} />
+        <EmailDeliverySummary guest={guest} dictionary={dictionary} locale={locale} />
       </div>
       <div className="mt-5 border-t border-white/10 pt-4">
         <GuestActions {...props} />
@@ -835,6 +1046,9 @@ function GuestTable({
   onRevoke: (guest: HostGuest) => void;
   onArchive: (guest: HostGuest) => void;
   onRestore: (guest: HostGuest) => void;
+  onEmailPreview: (guest: HostGuest) => void;
+  onEmailSend: (guest: HostGuest) => void;
+  emailBusy: string | null;
 }) {
   return (
     <div className="hidden overflow-x-auto rounded-3xl border border-white/10 bg-slate-900/80 lg:block">
@@ -863,7 +1077,7 @@ function GuestTable({
                 <ContactSummary guest={guest} dictionary={dictionary} />
               </td>
               <td className="max-w-52 p-4">
-                <Eligibility guest={guest} dictionary={dictionary} />
+                <EmailDeliverySummary guest={guest} dictionary={dictionary} locale={locale} />
               </td>
               <td className="p-4">
                 <StatusBadge guest={guest} dictionary={dictionary} />
@@ -889,6 +1103,9 @@ function GuestTable({
                   onRevoke={() => actions.onRevoke(guest)}
                   onArchive={() => actions.onArchive(guest)}
                   onRestore={() => actions.onRestore(guest)}
+                  onEmailPreview={() => actions.onEmailPreview(guest)}
+                  onEmailSend={() => actions.onEmailSend(guest)}
+                  emailBusy={actions.emailBusy === guest.id}
                 />
               </td>
             </tr>
@@ -916,6 +1133,49 @@ function Eligibility({ guest, dictionary }: { guest: HostGuest; dictionary: Dict
         {noContact ? dictionary.host.cannotNotify : dictionary.host.notificationNotConfigured}
       </strong>
       {noContact ? <p className="mt-1">{dictionary.host.contactMissing}</p> : null}
+    </div>
+  );
+}
+
+function EmailDeliverySummary({
+  guest,
+  dictionary,
+  locale,
+}: {
+  guest: HostGuest;
+  dictionary: Dictionary;
+  locale: Locale;
+}) {
+  const delivery = guest.emailDelivery;
+  if (!delivery) return <Eligibility guest={guest} dictionary={dictionary} />;
+  const last = delivery.lastAttempt;
+  return (
+    <div className="space-y-2 text-xs">
+      <Eligibility guest={guest} dictionary={dictionary} />
+      {last ? (
+        <div className="rounded-xl border border-white/10 bg-slate-950/50 p-2 text-slate-300">
+          <p>
+            {dictionary.host.lastEmailStatus}:{' '}
+            <strong className={last.status === 'FAILED' ? 'text-red-200' : 'text-cyan-100'}>
+              {last.status}
+            </strong>
+          </p>
+          <p>
+            {dictionary.host.lastEmailTime}:{' '}
+            <time>{formatDate(last.sentAt ?? last.updatedAt, locale, dictionary.host.never)}</time>
+          </p>
+          {delivery.retryAvailable ? (
+            <p className="mt-1 font-semibold text-amber-200">
+              {dictionary.host.emailRetryAvailable}
+            </p>
+          ) : null}
+          {last.safeErrorMessage ? (
+            <p className="mt-1 text-red-200">{last.safeErrorMessage}</p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-slate-400">{dictionary.host.noEmailAttempts}</p>
+      )}
     </div>
   );
 }
@@ -1148,16 +1408,7 @@ function SharingPreview({
           </div>
         )}
         <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-          <p>{dictionary.host.deliveryNotImplemented}</p>
-          <div className="mt-2 flex flex-wrap gap-2 opacity-70">
-            <span>{dictionary.host.emailPending}</span>
-            <span>·</span>
-            <span>{dictionary.host.smsPending}</span>
-            <span>·</span>
-            <span>{dictionary.host.sentFuture}</span>
-            <span>·</span>
-            <span>{dictionary.host.failedFuture}</span>
-          </div>
+          {dictionary.host.smsUnavailable}
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           {preview ? (
@@ -1217,6 +1468,69 @@ function TemplateCopyButton({
     >
       {copied ? '✓' : label}
     </button>
+  );
+}
+
+function EmailPreviewModal({
+  guest,
+  preview,
+  dictionary,
+  onClose,
+}: {
+  guest: HostGuest;
+  preview: EmailPreview | null;
+  dictionary: Dictionary;
+  onClose: () => void;
+}) {
+  const [mobile, setMobile] = useState(false);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={dictionary.host.emailPreview}
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 p-4 backdrop-blur-sm"
+    >
+      <div className="mx-auto my-6 max-w-5xl rounded-3xl border border-white/15 bg-slate-900 p-5 shadow-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+              {dictionary.host.emailPreview}
+            </p>
+            <h2 className="mt-1 text-xl font-black">{guest.displayName}</h2>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMobile((value) => !value)}
+              className="rounded-xl bg-white/10 px-4 py-2"
+            >
+              {mobile ? dictionary.host.desktopPreview : dictionary.host.mobilePreview}
+            </button>
+            <button onClick={onClose} className="rounded-xl bg-slate-700 px-4 py-2">
+              {dictionary.host.closePreview}
+            </button>
+          </div>
+        </div>
+        {!preview ? (
+          <p className="mt-6 text-slate-300">{dictionary.host.loadingPreview}</p>
+        ) : (
+          <div className="mt-5">
+            <p className="mb-3 rounded-xl bg-slate-950 p-3 text-sm">
+              <strong>{dictionary.host.emailSubject}:</strong> {preview.subject}
+            </p>
+            <div className="overflow-x-auto rounded-2xl bg-slate-950 p-3">
+              <iframe
+                title={dictionary.host.emailPreview}
+                sandbox=""
+                srcDoc={preview.html}
+                className="mx-auto h-[680px] rounded-xl bg-white transition-[width]"
+                style={{ width: mobile ? 390 : 680, maxWidth: '100%' }}
+              />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">{dictionary.host.previewUsesPlaceholder}</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1331,12 +1645,14 @@ function ActionButton({
   primary,
   warning,
   danger,
+  disabled,
 }: {
   label: string;
   onClick: () => void;
   primary?: boolean;
   warning?: boolean;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   const color = danger
     ? 'bg-red-800 hover:bg-red-700'
@@ -1349,7 +1665,8 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${color}`}
+      disabled={disabled}
+      className={`rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${color}`}
     >
       {label}
     </button>

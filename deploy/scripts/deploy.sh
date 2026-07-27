@@ -105,7 +105,7 @@ set +a
 runuser --user "${DEPLOY_USER}" --whitelist-environment=DATABASE_URL -- \
   /usr/bin/env "PATH=${RUNTIME_DIRECTORY}/bin:/usr/local/bin:/usr/bin:/bin" \
   "${PNPM_BINARY}" --dir "${REPOSITORY_DIRECTORY}" db:migrate
-unset DATABASE_URL HOST_ADMIN_TOKEN
+unset DATABASE_URL HOST_ADMIN_TOKEN SMTP_USERNAME SMTP_PASSWORD
 
 systemctl restart matemyparty-api.service
 for attempt in {1..20}; do

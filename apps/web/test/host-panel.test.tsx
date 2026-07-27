@@ -89,6 +89,63 @@ function mockRequests(currentGuest: HostGuest = guest) {
         confirmedChildren: currentGuest.invitation?.rsvp?.childrenAttending ?? 0,
         invitationsWithoutResponse: currentGuest.invitation?.rsvp ? 0 : 1,
       });
+    if (url.includes('/email/statistics'))
+      return response({
+        eligibleGuests: currentGuest.emailDelivery?.eligibility.eligible ? 1 : 0,
+        ineligibleGuests: currentGuest.emailDelivery?.eligibility.eligible ? 0 : 1,
+        queued: 0,
+        sending: 0,
+        sent: 0,
+        delivered: 0,
+        failed: 0,
+        cancelled: 0,
+      });
+    if (url.includes('/email/preview'))
+      return response({
+        subject: 'Invitation: Raymundo birthday',
+        html: '<!doctype html><html><body>Responsive invitation preview</body></html>',
+        text: 'Responsive invitation preview',
+        locale: 'en-US',
+        eventTitle: 'Raymundo birthday',
+        publicThumbnailUrl: null,
+        usesPlaceholderLink: true,
+      });
+    if (url.includes('/email/send'))
+      return response({
+        attempt: {
+          id: '99999999-9999-4999-8999-999999999999',
+          invitationId: '77777777-7777-4777-8777-777777777777',
+          status: 'SENT',
+          provider: 'stub',
+          providerStatus: 'ACCEPTED',
+          attemptNumber: 1,
+          locale: 'en-US',
+          subject: 'Invitation: Raymundo birthday',
+          retryable: false,
+          safeErrorCode: null,
+          safeErrorMessage: null,
+          queuedAt: '2026-07-27T00:00:00.000Z',
+          sentAt: '2026-07-27T00:00:01.000Z',
+          deliveredAt: null,
+          failedAt: null,
+          createdAt: '2026-07-27T00:00:00.000Z',
+          updatedAt: '2026-07-27T00:00:01.000Z',
+        },
+        invitation: {
+          id: '77777777-7777-4777-8777-777777777777',
+          status: 'SENT',
+          locale: 'en-US',
+          tokenPrefix: 'abcdefgh',
+          firstOpenedAt: null,
+          lastOpenedAt: null,
+          openCount: 0,
+          createdAt: '2026-07-27T00:00:00.000Z',
+          updatedAt: '2026-07-27T00:00:01.000Z',
+          revokedAt: null,
+        },
+        publicUrl: 'https://raymundo6th.domoforge.com/i/private-once',
+        duplicate: false,
+      });
     if (url.includes('/invitations/') && url.endsWith('/rsvp'))
       return response({
         invitationId: currentGuest.invitation?.id,
@@ -230,6 +287,53 @@ describe('host guest management screen', () => {
     expect(screen.getByText('SMS preview')).toBeInTheDocument();
     expect(screen.getByText(/characters/)).toBeInTheDocument();
     expect(screen.getByText('Calendar preview')).toBeInTheDocument();
-    expect(screen.getByText(/no message has been sent/i)).toBeInTheDocument();
+    expect(screen.getByText(/SMS delivery is unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/No SMS has been sent/i)).toBeInTheDocument();
+  });
+
+  it('previews real email HTML and sends through the CSRF-protected route', async () => {
+    const emailGuest: HostGuest = {
+      ...guest,
+      email: 'guest@example.test',
+      preferredChannel: 'EMAIL',
+      notificationEligibility: {
+        canNotifyAutomatically: true,
+        canEmail: true,
+        canSms: false,
+        reason: 'ELIGIBLE',
+      },
+      emailDelivery: {
+        eligibility: {
+          eligible: true,
+          action: 'GENERATE_AND_SEND',
+          reason: 'ELIGIBLE',
+          requiresRegeneration: false,
+        },
+        lastAttempt: null,
+        retryAvailable: false,
+      },
+    };
+    const fetchMock = mockRequests(emailGuest);
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Preview email' })[0]!);
+    expect(await screen.findByRole('dialog', { name: 'Email preview' })).toBeInTheDocument();
+    expect(screen.getByTitle('Email preview')).toHaveAttribute(
+      'srcdoc',
+      expect.stringContaining('Responsive invitation preview'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Close preview' }));
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Generate and send email' })[0]!);
+    const sendRequest = fetchMock.mock.calls.find(([url]) => String(url).includes('/email/send'));
+    expect(sendRequest?.[1]).toMatchObject({
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mmp-csrf': '1' },
+    });
+    expect(JSON.parse(String(sendRequest?.[1]?.body))).toMatchObject({
+      regenerate: false,
+      overridePreferredChannel: false,
+    });
   });
 });

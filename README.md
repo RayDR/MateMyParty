@@ -1,6 +1,6 @@
 # MateMyParty
 
-MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone adds private event details, safe maps actions, Google/Outlook/Apple calendar flows, standards-compliant ICS downloads, a localized countdown, public social thumbnails, and host sharing previews while preserving RSVP and the privacy-safe invitation lookup.
+MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone adds provider-neutral transactional invitation email, responsive localized previews, safe delivery attempts, idempotent retries, and SMTP production configuration while preserving RSVP, maps/calendar flows, and privacy-safe invitation lookup.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ The pnpm/Turborepo workspace contains:
 - `packages/i18n`: separate `en-US` and `es-MX` JSON dictionaries.
 - `packages/ui`, `config`, and `typescript-config`: deliberately small shared foundations.
 
-See [docs/architecture.md](docs/architecture.md) for boundaries and decisions.
+See [docs/architecture.md](docs/architecture.md) for boundaries and decisions. Transactional invitation email architecture, protected endpoints, lifecycle, and privacy guarantees are documented in [docs/email-delivery.md](docs/email-delivery.md).
 
 The public platform hostname is `matemyparty.domoforge.com`; the first event remains available through `raymundo6th.domoforge.com` and the local `/events/raymundo-6` route.
 
@@ -75,7 +75,7 @@ For a browser, add `127.0.0.1 raymundo6th.domoforge.com matemyparty.domoforge.co
 
 ## Database workflow
 
-`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, `0005_freezing_romulus.sql` for current RSVP state plus immutable history, `0006_smiling_sage.sql` for the current-response update-time index, and `0007_cool_gideon.sql` for nullable coordinates, parking copy, a separated public social thumbnail, and related constraints. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
+`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, `0005_freezing_romulus.sql` for current RSVP state plus immutable history, `0006_smiling_sage.sql` for the current-response update-time index, `0007_cool_gideon.sql` for maps/calendar and separated social thumbnails, and `0008_fancy_yellow_claw.sql` for token-free email delivery attempts and lifecycle constraints. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
 
 Optional non-personal sample guests are inserted only when explicitly requested:
 

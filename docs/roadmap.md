@@ -12,7 +12,8 @@
 - [x] Four localized presentation modes, media fallbacks, reduced motion, and protected host preview.
 - [x] RSVP responses, bounded attendance, dietary notes, guest messages, history, and host totals.
 - [x] Maps links, localized calendar providers/ICS, countdown, public social thumbnails, and sharing previews.
-- [ ] **Next milestone: transactional email provider and delivery tracking.**
+- [x] Transactional invitation email provider, previews, attempts, and safe delivery tracking.
+- [ ] **Next milestone: birthday release, production deployment, and end-to-end QA.**
 - [ ] Replace temporary host access with authenticated users and event authorization.
 - [ ] Scheduled reminders and delivery preferences.
 - [ ] SMS provider behind a messaging adapter.
