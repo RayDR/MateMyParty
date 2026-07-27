@@ -250,7 +250,11 @@ describe('RsvpService', () => {
 
 describe('RsvpRateLimiter', () => {
   it('limits a privacy-hashed credential bucket within the window', () => {
-    const limiter = new RsvpRateLimiter(2, 60_000, () => 1000);
+    const limiter = RsvpRateLimiter.createForTesting({
+      maximumAttempts: 2,
+      windowMilliseconds: 60_000,
+      now: () => 1000,
+    });
     expect(limiter.consume('127.0.0.1|secret')).toBe(true);
     expect(limiter.consume('127.0.0.1|secret')).toBe(true);
     expect(limiter.consume('127.0.0.1|secret')).toBe(false);
