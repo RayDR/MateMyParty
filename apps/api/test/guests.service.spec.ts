@@ -6,6 +6,7 @@ import { calculateGuestInvitationStatistics, GuestsService } from '../src/guests
 import type { EventsRepository } from '../src/events/events.repository';
 import type { InvitationsRepository } from '../src/invitations/invitations.repository';
 import type { InvitationsService } from '../src/invitations/invitations.service';
+import type { EmailDeliveryService } from '../src/email/email-delivery.service';
 
 type GuestRow = typeof guests.$inferSelect;
 
@@ -59,8 +60,18 @@ function setup() {
     findLatestByGuest: jest.fn().mockResolvedValue(null),
   } as unknown as InvitationsRepository;
   const invitations = {} as InvitationsService;
+  const emailDelivery = {
+    guestSummary: jest.fn(),
+  } as unknown as EmailDeliveryService;
   return {
-    service: new GuestsService(connection, events, repository, invitationsRepository, invitations),
+    service: new GuestsService(
+      connection,
+      events,
+      repository,
+      invitationsRepository,
+      invitations,
+      emailDelivery,
+    ),
     current: () => row,
   };
 }

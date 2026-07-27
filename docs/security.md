@@ -56,6 +56,8 @@ Event updates accept only shared-contract fields, supported locales, allowed tem
 
 Invitation activity can store a user agent truncated to 160 characters, one supported requested locale, and a referrer hostname. It does not store full referrer URLs or IP addresses. Infrastructure access logs must redact `/i/*` path segments because the URL itself contains a credential. Application code must never log request parameters for invitation routes.
 
+Invitation email mutations remain behind the host session, the server-side bearer-token proxy, and an exact internal CSRF marker. The browser never receives SMTP credentials or `HOST_ADMIN_TOKEN`. Preview and test-email flows use a non-functional HTTPS placeholder and do not generate invitation tokens. A real send renders the raw private link only in memory, queues a token-free delivery audit row in the same transaction as invitation creation/rotation, and passes the message directly to the provider adapter. Database rows contain only a SHA-256 recipient fingerprint and bounded safe status fields; no raw recipient, body, token, provider exception, or credential is persisted.
+
 ## Maps, calendars, and social previews
 
 Schedule, location, maps links, and calendar data exist only in `PrivateInvitation` or host contracts. The public event root remains structurally unable to carry them. Private calendar endpoints require a valid permanent token or unexpired access grant on every request; archived guests and revoked invitations receive the same neutral 404 as unknown credentials. Calendar reads may update a grant's last-used time but do not increment invitation opens.

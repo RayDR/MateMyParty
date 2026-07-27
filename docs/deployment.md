@@ -79,6 +79,8 @@ sudo chmod 0600 /etc/matemyparty/matemyparty.env
 
 Replace every placeholder. Use a cryptographically random `HOST_ADMIN_TOKEN` of at least 32 characters. The production file must retain `WEB_HOST=127.0.0.1`, `WEB_PORT=3200`, `API_HOST=127.0.0.1`, `API_PORT=3201`, `INTERNAL_API_BASE_URL=http://127.0.0.1:3201`, `PRIMARY_APP_HOSTNAME=matemyparty.domoforge.com`, and `PUBLIC_APP_PROTOCOL=https`.
 
+Production also requires `EMAIL_PROVIDER=smtp`, a verified sender, and the SMTP values shown in `.env.production.example`. Keep the SMTP username and password only in the root-owned `0600` environment file. `SMTP_SECURE=false` is appropriate for STARTTLS on port 587; use `true` only when the provider documents implicit TLS (commonly port 465). Never place provider credentials in Git, shell history, command arguments, or support logs.
+
 `INTERNAL_API_BASE_URL` is server-only and deliberately has no `NEXT_PUBLIC_` prefix. The browser uses relative `/internal/host/*` requests and never receives `HOST_ADMIN_TOKEN`.
 
 The systemd manager reads `EnvironmentFile` before dropping privileges, so the application user does not need direct read access. Root ownership also prevents the service account from injecting commands into the root-run deployment script. Verify without printing the file:

@@ -117,6 +117,57 @@ export const notificationEligibilitySchema = z.object({
   reason: z.enum(['ELIGIBLE', 'NO_CONTACT', 'NOT_CONFIGURED']),
 });
 
+export const emailDeliveryStatusSchema = z.enum([
+  'QUEUED',
+  'SENDING',
+  'SENT',
+  'DELIVERED',
+  'FAILED',
+  'CANCELLED',
+]);
+
+export const emailDeliveryAttemptSchema = z.object({
+  id: z.uuid(),
+  invitationId: z.uuid(),
+  status: emailDeliveryStatusSchema,
+  provider: z.string().min(1).max(40),
+  providerStatus: z.string().max(80).nullable(),
+  attemptNumber: z.number().int().positive(),
+  locale: supportedLocaleSchema,
+  subject: z.string().min(1).max(200),
+  retryable: z.boolean(),
+  safeErrorCode: z.string().max(80).nullable(),
+  safeErrorMessage: z.string().max(300).nullable(),
+  queuedAt: z.iso.datetime(),
+  sentAt: z.iso.datetime().nullable(),
+  deliveredAt: z.iso.datetime().nullable(),
+  failedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const emailEligibilitySchema = z.object({
+  eligible: z.boolean(),
+  action: z.enum(['GENERATE_AND_SEND', 'REGENERATE_AND_SEND']).nullable(),
+  reason: z.enum([
+    'ELIGIBLE',
+    'GUEST_ARCHIVED',
+    'EMAIL_MISSING',
+    'CHANNEL_NOT_ALLOWED',
+    'INVITATION_REVOKED',
+    'TOKEN_REGENERATION_REQUIRED',
+    'EVENT_NOT_SENDABLE',
+    'EMAIL_NOT_CONFIGURED',
+  ]),
+  requiresRegeneration: z.boolean(),
+});
+
+export const guestEmailDeliverySchema = z.object({
+  eligibility: emailEligibilitySchema,
+  lastAttempt: emailDeliveryAttemptSchema.nullable(),
+  retryAvailable: z.boolean(),
+});
+
 export const hostGuestSchema = z.object({
   id: z.uuid(),
   displayName: z.string(),
@@ -131,6 +182,7 @@ export const hostGuestSchema = z.object({
   childrenInvited: z.number().int().nonnegative().nullable(),
   privateNotes: z.string().nullable(),
   notificationEligibility: notificationEligibilitySchema,
+  emailDelivery: guestEmailDeliverySchema.optional(),
   invitation: invitationSummarySchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -201,6 +253,10 @@ export type CreateGuestInput = z.infer<typeof createGuestInputSchema>;
 export type HostGuest = z.infer<typeof hostGuestSchema>;
 export type InvitationSummary = z.infer<typeof invitationSummarySchema>;
 export type NotificationEligibility = z.infer<typeof notificationEligibilitySchema>;
+export type EmailDeliveryStatus = z.infer<typeof emailDeliveryStatusSchema>;
+export type EmailDeliveryAttempt = z.infer<typeof emailDeliveryAttemptSchema>;
+export type EmailEligibility = z.infer<typeof emailEligibilitySchema>;
+export type GuestEmailDelivery = z.infer<typeof guestEmailDeliverySchema>;
 export type GuestInvitationStatistics = z.infer<typeof guestInvitationStatisticsSchema>;
 export type InvitationSharePreview = z.infer<typeof invitationSharePreviewSchema>;
 export type CreateInvitationResult = z.infer<typeof createInvitationResultSchema>;

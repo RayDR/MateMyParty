@@ -2,6 +2,7 @@ import {
   hostGuestSchema,
   invitationSummarySchema,
   type HostGuest,
+  type GuestEmailDelivery,
   type InvitationSummary,
   type NotificationEligibility,
 } from '@matemyparty/contracts';
@@ -63,6 +64,7 @@ export function presentGuest(
   row: GuestRow,
   invitation: InvitationRow | null,
   rsvp: RsvpRow | null = null,
+  emailDelivery?: GuestEmailDelivery,
 ): HostGuest {
   return hostGuestSchema.parse({
     id: row.id,
@@ -78,6 +80,7 @@ export function presentGuest(
     childrenInvited: row.childrenInvited,
     privateNotes: row.privateNotes,
     notificationEligibility: notificationEligibilityForGuest(row),
+    emailDelivery,
     invitation: invitation ? presentInvitation(invitation, rsvp) : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

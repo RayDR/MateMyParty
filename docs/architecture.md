@@ -43,7 +43,7 @@ Event media is referenced rather than uploaded in this milestone. See [event-med
 
 `Guest` describes a person, family, or group and contains host-private contact and planning data. `Invitation` is a separate lifecycle record with a public credential, open counters, and revocation state. This separation permits a guest to survive historical invitation replacements and permits revoked links to remain auditable. Archiving is a timestamped soft delete and never removes invitations or activity.
 
-Guest party size is explicit. `TOTAL_ONLY` stores one non-negative total and no adult/child values. `ADULTS_AND_CHILDREN` stores both non-negative components and a database-checked derived total. The API repeats these rules in the shared Zod contract so browser, service, and PostgreSQL semantics agree. Notification eligibility is derived from the preferred channel and normalized contact fields; no delivery attempt is stored until a delivery provider exists.
+Guest party size is explicit. `TOTAL_ONLY` stores one non-negative total and no adult/child values. `ADULTS_AND_CHILDREN` stores both non-negative components and a database-checked derived total. The API repeats these rules in the shared Zod contract so browser, service, and PostgreSQL semantics agree. Notification and email-delivery eligibility are derived from guest state, preferred channel, normalized contact fields, event state, invitation state, and provider availability.
 
 A partial unique index on `guest_id WHERE revoked_at IS NULL` permits only one active invitation per guest. Regeneration revokes rather than overwrites the previous row, then inserts a new invitation in the same transaction.
 
@@ -51,7 +51,7 @@ A partial unique index on `guest_id WHERE revoked_at IS NULL` permits only one a
 
 Creation uses 32 cryptographically random bytes encoded as 43 base64url characters. The raw token is returned once. PostgreSQL stores a SHA-256 hash and an eight-character diagnostic prefix; the prefix narrows lookup candidates and a timing-safe comparison confirms the full hash. There is deliberately no token recovery endpoint.
 
-The current lifecycle is `READY` to `OPENED`, with `SENT` reserved for a later delivery milestone. `REVOKED` is terminal. Regeneration creates a distinct `READY` record. Every create, open, revoke, and regeneration produces `InvitationActivity`; it does not replace `EventRevision`.
+The invitation lifecycle is `READY` to `SENT` after provider acceptance and `OPENED` after a valid private render. `REVOKED` is terminal. Regeneration creates a distinct `READY` record. Every create, open, revoke, and regeneration produces `InvitationActivity`; it does not replace `EventRevision`.
 
 Token candidate queries join the guest row and require both `invitations.revoked_at IS NULL` and `guests.archived_at IS NULL`. Private-detail resolution repeats those predicates inside the tracking transaction. Restoring an archived guest makes its still-active historical invitation eligible again; regeneration remains the explicit way to issue a different permanent credential.
 
@@ -95,6 +95,16 @@ The countdown derives from the stored UTC instant on the client after hydration,
 
 Social sharing uses only a localized event title, generic copy, canonical event hostname, alt text, and `public_thumbnail_ref`. Local public thumbnails live under `/event-thumbnails/<slug>/` and are physically separate from `/private-media/`; protected video and audio can never satisfy the public-thumbnail contract. Host sharing previews provide WhatsApp-style and Open Graph approximations, SMS character counts, calendar summaries, and copy actions without recording or claiming delivery.
 
+## Transactional invitation email
+
+The API email module owns a provider-neutral `EmailProvider` interface and the delivery workflow. Production selects an authenticated SMTP adapter from server-only configuration; development and tests use a non-delivering stub. Controllers remain provider-agnostic and contain no SQL. The actual responsive HTML renderer is shared by host preview, provider test, and guest delivery paths.
+
+`EmailDeliveryAttempt` preserves every attempt with event, guest, and invitation relationships, status timestamps, template metadata, a recipient fingerprint, and bounded safe provider fields. It never stores raw recipient addresses, bodies, invitation tokens, credentials, or provider exceptions. SMTP acceptance maps to `SENT`; `DELIVERED` is reserved for authenticated callbacks that SMTP does not provide.
+
+Generation or explicit rotation of the hash-only invitation credential and insertion of the `QUEUED` attempt occur in one transaction under a guest row lock. The raw URL exists only in memory for rendering. A unique idempotency key prevents replay, and an in-progress check prevents a concurrent request from rotating a link while its email is being handed off. Provider work runs outside the transaction behind bounded process concurrency and per-guest rate limiting. Startup recovery converts stale `SENDING` rows to safe retryable failures.
+
+The host browser uses the existing session-protected Next proxy. Email POST routes additionally require same-origin validation and an exact CSRF header at the web boundary, then the API repeats the marker check behind its bearer guard. Preview uses a non-functional HTTPS placeholder and creates no attempt. A test email is provider-marked as a test and is not associated with guest delivery history. See [email-delivery.md](email-delivery.md) for endpoints and operations.
+
 ## Temporary host protection
 
 Nest host controllers use a reusable timing-safe bearer-token guard. Production startup rejects a missing, short, or known example token. The web access form compares the secret only on the server and stores a derived HMAC value in an HttpOnly, SameSite=Strict cookie. Internal Next routes validate that cookie and add the bearer token server-side, so browser JavaScript never receives `HOST_ADMIN_TOKEN`.
@@ -103,4 +113,4 @@ This is intentionally isolated temporary protection. Real authentication will re
 
 ## Future providers
 
-Email, SMS, object storage, payments, and AI can later sit behind provider interfaces owned by their feature modules. No delivery provider or infrastructure is installed before a use case needs it. Transactional email delivery and tracking are the next domain milestone.
+SMS, object storage, payments, and AI can later sit behind provider interfaces owned by their feature modules. Transactional email already follows this boundary and does not imply a future SMS provider.

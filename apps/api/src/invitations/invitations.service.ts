@@ -64,30 +64,37 @@ export class InvitationsService {
   }
 
   regenerate(invitationId: string): Promise<RegenerateInvitationResult> {
-    return this.repository.transaction(async (executor) => {
-      const previous = await this.repository.findById(invitationId, executor);
-      if (!previous) throw new ApiError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
-      const active = await this.repository.findActiveByGuest(previous.guestId, executor);
-      if (active && active.id !== previous.id) {
-        throw new ApiError(
-          409,
-          'ACTIVE_INVITATION_EXISTS',
-          'Another active invitation already exists',
-        );
-      }
-      if (!previous.revokedAt) {
-        await this.repository.revoke(previous.id, executor);
-        await this.repository.addActivity(previous.id, 'REVOKED', null, executor);
-      }
-      await this.repository.revokeAccessGrants(previous.id, executor);
-      const guest = await this.repository.guestById(previous.guestId, executor);
-      if (!guest || guest.archivedAt) throw new ApiError(404, 'GUEST_NOT_FOUND', 'Guest not found');
-      const created = await this.createForGuestInTransaction(guest, executor, 'REGENERATED');
-      return regenerateInvitationResultSchema.parse({
-        invitation: created.invitation,
-        publicUrl: created.publicUrl,
-        newToken: created.token,
-      });
+    return this.repository.transaction((executor) =>
+      this.regenerateInTransaction(invitationId, executor),
+    );
+  }
+
+  async regenerateInTransaction(
+    invitationId: string,
+    executor: DatabaseExecutor,
+  ): Promise<RegenerateInvitationResult> {
+    const previous = await this.repository.findById(invitationId, executor);
+    if (!previous) throw new ApiError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
+    const active = await this.repository.findActiveByGuest(previous.guestId, executor);
+    if (active && active.id !== previous.id) {
+      throw new ApiError(
+        409,
+        'ACTIVE_INVITATION_EXISTS',
+        'Another active invitation already exists',
+      );
+    }
+    if (!previous.revokedAt) {
+      await this.repository.revoke(previous.id, executor);
+      await this.repository.addActivity(previous.id, 'REVOKED', null, executor);
+    }
+    await this.repository.revokeAccessGrants(previous.id, executor);
+    const guest = await this.repository.guestById(previous.guestId, executor);
+    if (!guest || guest.archivedAt) throw new ApiError(404, 'GUEST_NOT_FOUND', 'Guest not found');
+    const created = await this.createForGuestInTransaction(guest, executor, 'REGENERATED');
+    return regenerateInvitationResultSchema.parse({
+      invitation: created.invitation,
+      publicUrl: created.publicUrl,
+      newToken: created.token,
     });
   }
 

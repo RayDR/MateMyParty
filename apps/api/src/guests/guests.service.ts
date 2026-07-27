@@ -9,6 +9,7 @@ import {
 } from '@matemyparty/contracts';
 import type { DatabaseConnection } from '@matemyparty/database';
 import { ApiError, parseInput } from '../common/api-error';
+import { EmailDeliveryService } from '../email/email-delivery.service';
 import { DATABASE } from '../database/database.module';
 import { EventsRepository } from '../events/events.repository';
 import { InvitationsRepository } from '../invitations/invitations.repository';
@@ -24,13 +25,21 @@ export class GuestsService {
     private readonly guests: GuestsRepository,
     private readonly invitationsRepository: InvitationsRepository,
     private readonly invitations: InvitationsService,
+    private readonly emailDelivery: EmailDeliveryService,
   ) {}
 
   async list(eventIdentifier: string, includeArchived: boolean): Promise<HostGuest[]> {
     const eventId = await this.events.findInternalIdByIdentifier(eventIdentifier);
     if (!eventId) throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
-    return (await this.guests.list(eventId, includeArchived)).map(({ guest, invitation, rsvp }) =>
-      presentGuest(guest, invitation, rsvp),
+    return Promise.all(
+      (await this.guests.list(eventId, includeArchived)).map(async ({ guest, invitation, rsvp }) =>
+        presentGuest(
+          guest,
+          invitation,
+          rsvp,
+          await this.emailDelivery.guestSummary(guest, invitation),
+        ),
+      ),
     );
   }
 

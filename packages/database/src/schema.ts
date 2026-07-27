@@ -42,6 +42,15 @@ export const invitationActivityType = pgEnum('invitation_activity_type', [
   'REGENERATED',
 ]);
 export const invitationLookupMethod = pgEnum('invitation_lookup_method', ['EMAIL', 'PHONE']);
+export const emailDeliveryChannel = pgEnum('email_delivery_channel', ['EMAIL']);
+export const emailDeliveryStatus = pgEnum('email_delivery_status', [
+  'QUEUED',
+  'SENDING',
+  'SENT',
+  'DELIVERED',
+  'FAILED',
+  'CANCELLED',
+]);
 export const rsvpStatus = pgEnum('rsvp_status', ['ACCEPTED', 'DECLINED', 'NOT_SURE', 'CANCELLED']);
 export const rsvpChangeSource = pgEnum('rsvp_change_source', ['INVITEE', 'HOST']);
 
@@ -313,6 +322,74 @@ export const invitationActivities = pgTable(
     metadata: jsonb('metadata'),
   },
   (table) => [index('invitation_activities_invitation_id_index').on(table.invitationId)],
+);
+
+export const emailDeliveryAttempts = pgTable(
+  'email_delivery_attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    invitationId: uuid('invitation_id')
+      .notNull()
+      .references(() => invitations.id),
+    guestId: uuid('guest_id')
+      .notNull()
+      .references(() => guests.id),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    channel: emailDeliveryChannel('channel').notNull().default('EMAIL'),
+    status: emailDeliveryStatus('status').notNull().default('QUEUED'),
+    provider: text('provider').notNull(),
+    providerMessageId: text('provider_message_id'),
+    providerStatus: text('provider_status'),
+    attemptNumber: integer('attempt_number').notNull(),
+    recipientHash: text('recipient_hash').notNull(),
+    locale: text('locale').notNull(),
+    subjectSnapshot: text('subject_snapshot').notNull(),
+    templateVersion: integer('template_version').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    retryable: boolean('retryable').notNull().default(false),
+    safeErrorCode: text('safe_error_code'),
+    safeErrorMessage: text('safe_error_message'),
+    queuedAt: timestamp('queued_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true, mode: 'date' }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'date' }),
+    failedAt: timestamp('failed_at', { withTimezone: true, mode: 'date' }),
+    ...auditColumns,
+  },
+  (table) => [
+    uniqueIndex('email_delivery_attempts_idempotency_unique').on(table.idempotencyKey),
+    uniqueIndex('email_delivery_attempts_guest_attempt_unique').on(
+      table.guestId,
+      table.attemptNumber,
+    ),
+    index('email_delivery_attempts_invitation_index').on(table.invitationId, table.createdAt),
+    index('email_delivery_attempts_event_status_index').on(table.eventId, table.status),
+    index('email_delivery_attempts_guest_created_index').on(table.guestId, table.createdAt),
+    index('email_delivery_attempts_sending_updated_index').on(table.status, table.updatedAt),
+    check('email_delivery_attempts_attempt_positive', sql`${table.attemptNumber} > 0`),
+    check(
+      'email_delivery_attempts_recipient_hash_check',
+      sql`${table.recipientHash} ~ '^[a-f0-9]{64}$'`,
+    ),
+    check('email_delivery_attempts_locale_check', sql`${table.locale} in ('en-US', 'es-MX')`),
+    check(
+      'email_delivery_attempts_snapshot_lengths_check',
+      sql`length(${table.subjectSnapshot}) between 1 and 200 and length(${table.provider}) between 1 and 40 and length(${table.idempotencyKey}) between 1 and 100`,
+    ),
+    check(
+      'email_delivery_attempts_idempotency_uuid_check',
+      sql`${table.idempotencyKey} ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`,
+    ),
+    check(
+      'email_delivery_attempts_safe_error_lengths_check',
+      sql`length(${table.safeErrorCode}) <= 80 and length(${table.safeErrorMessage}) <= 300`,
+    ),
+    check(
+      'email_delivery_attempts_terminal_timestamp_check',
+      sql`(${table.status} not in ('SENT', 'DELIVERED') or ${table.sentAt} is not null) and (${table.status} <> 'DELIVERED' or ${table.deliveredAt} is not null) and (${table.status} <> 'FAILED' or ${table.failedAt} is not null)`,
+    ),
+  ],
 );
 
 export const rsvps = pgTable(

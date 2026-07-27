@@ -31,6 +31,23 @@ sudo grep -E '/i/[^ ?]+' /var/log/nginx/matemyparty.access.log
 
 The expected result is no output. Do not disable the error log globally.
 
+## Invitation email delivery
+
+The API uses a provider-neutral adapter; production currently selects the SMTP adapter through the protected environment file. A successful SMTP handoff is recorded as `SENT`, not `DELIVERED`: SMTP acceptance cannot prove inbox delivery. `DELIVERED` is reserved for a future authenticated provider event. Failed attempts store only bounded, operator-safe categories; recipient addresses, credentials, raw provider errors, and invitation tokens are excluded.
+
+The host panel can preview responsive HTML without creating a token, send a test template without creating a delivery attempt, and explicitly generate or rotate an invitation when sending. A rotation invalidates the previous raw link. Idempotency keys, a per-guest database lock, an in-progress guard, bounded concurrency, and rate limiting protect repeated and concurrent requests. On API startup, stale `SENDING` attempts older than 15 minutes become retryable failures.
+
+To inspect aggregate state without revealing recipients:
+
+```bash
+sudo -u postgres psql -d matemyparty -c \
+  "select status, count(*) from email_delivery_attempts group by status order by status"
+sudo journalctl -u matemyparty-api.service --since '30 minutes ago' \
+  | grep -E 'EMAIL_|SMTP_' || true
+```
+
+Never query or paste `recipient_hash`, `provider_message_id`, subjects, or invitation identifiers into tickets. For a provider outage, keep the service running, verify provider status and protected configuration, then retry only from the host panel. A retry deliberately rotates the invitation link. Do not edit attempt rows manually.
+
 ## Local health and listeners
 
 ```bash

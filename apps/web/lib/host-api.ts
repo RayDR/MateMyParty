@@ -27,11 +27,34 @@ export async function forwardHostRequest(
     headers: {
       authorization: `Bearer ${token}`,
       ...(body ? { 'content-type': 'application/json' } : {}),
+      ...(request.headers.get('x-mmp-csrf') === '1' ? { 'x-mmp-csrf': '1' } : {}),
     },
   });
   const responseBody = await upstream.text();
   return new NextResponse(responseBody, {
     status: upstream.status,
-    headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },
+    headers: {
+      'content-type': upstream.headers.get('content-type') ?? 'application/json',
+      'cache-control': 'no-store, private',
+    },
   });
+}
+
+export function rejectInvalidHostMutation(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  try {
+    if (
+      origin &&
+      new URL(origin).origin === request.nextUrl.origin &&
+      request.headers.get('x-mmp-csrf') === '1'
+    ) {
+      return null;
+    }
+  } catch {
+    // Return the same neutral rejection for malformed and cross-origin values.
+  }
+  return NextResponse.json(
+    { code: 'CSRF_REJECTED', message: 'Request validation failed', status: 403 },
+    { status: 403 },
+  );
 }

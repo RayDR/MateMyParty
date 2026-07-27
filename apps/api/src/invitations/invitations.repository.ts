@@ -91,6 +91,18 @@ export class InvitationsRepository {
       );
   }
 
+  async markSent(id: string) {
+    const now = new Date();
+    const rows = await this.connection.db
+      .update(invitations)
+      .set({ status: 'SENT', updatedAt: now })
+      .where(
+        and(eq(invitations.id, id), eq(invitations.status, 'READY'), isNull(invitations.revokedAt)),
+      )
+      .returning();
+    return rows[0] ?? this.findById(id);
+  }
+
   async findLookupMatch(
     eventIdentifier: string,
     displayName: string,
