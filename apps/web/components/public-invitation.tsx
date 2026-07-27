@@ -257,6 +257,21 @@ function RsvpPanel({
               )}
             </p>
           ) : null}
+          {response.dietaryNotes ? (
+            <p className="mt-2 text-sm text-slate-200">
+              <strong>{dictionary.invitation.rsvpDietaryNotesSummary}:</strong>{' '}
+              {response.dietaryNotes}
+            </p>
+          ) : null}
+          {response.guestMessage ? (
+            <p className="mt-2 text-sm text-slate-200">
+              <strong>{dictionary.invitation.rsvpGuestMessageSummary}:</strong>{' '}
+              {response.guestMessage}
+            </p>
+          ) : null}
+          <p className="mt-3 rounded-xl border border-dashed border-white/15 p-3 text-xs text-slate-400">
+            {dictionary.invitation.rsvpCalendarPlaceholder}
+          </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"

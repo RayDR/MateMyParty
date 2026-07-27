@@ -75,7 +75,7 @@ For a browser, add `127.0.0.1 raymundo6th.domoforge.com matemyparty.domoforge.co
 
 ## Database workflow
 
-`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, and `0005_freezing_romulus.sql` for current RSVP state plus immutable history. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
+`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, `0005_freezing_romulus.sql` for current RSVP state plus immutable history, and `0006_smiling_sage.sql` for the current-response update-time index. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
 
 Optional non-personal sample guests are inserted only when explicitly requested:
 

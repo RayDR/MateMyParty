@@ -64,6 +64,8 @@ describe('/i/[token] content', () => {
       }),
     );
     expect(await screen.findByText('3 people confirmed')).toBeInTheDocument();
+    expect(screen.getByText(/See you there/)).toBeInTheDocument();
+    expect(screen.getByText(/Add-to-calendar options/)).toBeInTheDocument();
     fetchMock.mockRestore();
   });
 
@@ -82,7 +84,7 @@ describe('/i/[token] content', () => {
       totalAttending: 4,
       adultsAttending: 2,
       childrenAttending: 2,
-      dietaryNotes: null,
+      dietaryNotes: 'Vegetarian meal',
       guestMessage: null,
       respondedAt: '2026-07-27T01:00:00.000Z',
       updatedAt: '2026-07-27T01:00:00.000Z',

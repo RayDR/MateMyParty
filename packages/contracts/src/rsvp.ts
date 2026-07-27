@@ -34,6 +34,8 @@ export const cancelPublicRsvpRequestSchema = z.object({}).strict();
 
 export const hostRsvpSummarySchema = attendanceSchema.extend({
   status: rsvpStatusSchema,
+  hasDietaryNotes: z.boolean(),
+  hasGuestMessage: z.boolean(),
   updatedAt: z.iso.datetime(),
 });
 

@@ -24,6 +24,8 @@ type Filter =
   | 'declined'
   | 'notSure'
   | 'cancelled'
+  | 'dietaryNotes'
+  | 'guestMessage'
   | 'archived';
 type InvitationResult = {
   guest?: HostGuest;
@@ -154,6 +156,8 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
       if (filter === 'declined') return guest.invitation?.rsvp?.status === 'DECLINED';
       if (filter === 'notSure') return guest.invitation?.rsvp?.status === 'NOT_SURE';
       if (filter === 'cancelled') return guest.invitation?.rsvp?.status === 'CANCELLED';
+      if (filter === 'dietaryNotes') return Boolean(guest.invitation?.rsvp?.hasDietaryNotes);
+      if (filter === 'guestMessage') return Boolean(guest.invitation?.rsvp?.hasGuestMessage);
       if (filter === 'archived') return Boolean(guest.archivedAt);
       return !guest.archivedAt;
     });
@@ -422,6 +426,8 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
               <option value="declined">{dictionary.host.filterRsvpDeclined}</option>
               <option value="notSure">{dictionary.host.filterRsvpNotSure}</option>
               <option value="cancelled">{dictionary.host.filterRsvpCancelled}</option>
+              <option value="dietaryNotes">{dictionary.host.filterDietaryNotes}</option>
+              <option value="guestMessage">{dictionary.host.filterGuestMessage}</option>
               <option value="archived">{dictionary.host.filterArchived}</option>
             </select>
           </div>
@@ -795,7 +801,7 @@ function GuestCard(props: GuestActionProps & { locale: Locale }) {
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <ContactSummary guest={guest} dictionary={dictionary} />
         <InvitationOpeningSummary guest={guest} dictionary={dictionary} locale={locale} />
-        <RsvpSummary guest={guest} dictionary={dictionary} />
+        <RsvpSummary guest={guest} dictionary={dictionary} locale={locale} />
       </div>
       <div className="mt-4">
         <Eligibility guest={guest} dictionary={dictionary} />
@@ -866,7 +872,7 @@ function GuestTable({
                 <InvitationOpeningSummary guest={guest} dictionary={dictionary} locale={locale} />
               </td>
               <td className="p-4">
-                <RsvpSummary guest={guest} dictionary={dictionary} />
+                <RsvpSummary guest={guest} dictionary={dictionary} locale={locale} />
               </td>
               <td className="max-w-80 p-4">
                 <GuestActions
@@ -953,7 +959,15 @@ function InvitationOpeningSummary({
   );
 }
 
-function RsvpSummary({ guest, dictionary }: { guest: HostGuest; dictionary: Dictionary }) {
+function RsvpSummary({
+  guest,
+  dictionary,
+  locale,
+}: {
+  guest: HostGuest;
+  dictionary: Dictionary;
+  locale: Locale;
+}) {
   const response = guest.invitation?.rsvp;
   if (!guest.invitation || guest.invitation.revokedAt) {
     return <span className="text-xs text-slate-400">{dictionary.host.rsvpNotApplicable}</span>;
@@ -973,6 +987,22 @@ function RsvpSummary({ guest, dictionary }: { guest: HostGuest; dictionary: Dict
           {dictionary.host.rsvpPeople.replace('{count}', String(response.totalAttending ?? 0))}
         </p>
       ) : null}
+      <div className="mt-1 flex flex-wrap gap-1 text-[0.7rem]">
+        {response.hasDietaryNotes ? (
+          <span className="rounded-full bg-violet-500/15 px-2 py-0.5">
+            {dictionary.host.rsvpDietaryIndicator}
+          </span>
+        ) : null}
+        {response.hasGuestMessage ? (
+          <span className="rounded-full bg-cyan-500/15 px-2 py-0.5">
+            {dictionary.host.rsvpMessageIndicator}
+          </span>
+        ) : null}
+      </div>
+      <time className="mt-1 block text-[0.7rem] text-slate-500">
+        {dictionary.host.rsvpLastResponse}:{' '}
+        {formatDate(response.updatedAt, locale, dictionary.host.never)}
+      </time>
     </div>
   );
 }

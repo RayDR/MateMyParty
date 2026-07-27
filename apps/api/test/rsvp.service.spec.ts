@@ -166,6 +166,20 @@ describe('RsvpService', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
+  it('clears attendance for an explicit not-sure response', async () => {
+    const { repository, service } = setup();
+    await service.create(
+      { permanentToken: 'token' },
+      { status: 'NOT_SURE', totalAttending: 4, adultsAttending: 2, childrenAttending: 2 },
+    );
+    expect(repository.row).toMatchObject({
+      status: 'NOT_SURE',
+      totalAttending: null,
+      adultsAttending: null,
+      childrenAttending: null,
+    });
+  });
+
   it('records only meaningful updates and supports cancellation after acceptance', async () => {
     const { repository, service } = setup();
     const payload = { status: 'ACCEPTED' as const, totalAttending: 2 };
@@ -220,15 +234,18 @@ describe('RsvpService', () => {
     expect(JSON.stringify(result)).not.toContain('opaque-grant');
   });
 
-  it('propagates the same neutral invitation error for invalid or revoked access', async () => {
-    const { invitations, service } = setup();
-    jest
-      .mocked(invitations.resolveAccess)
-      .mockRejectedValue(new ApiError(404, 'INVITATION_NOT_FOUND', 'Invitation not found'));
-    await expect(service.current({ permanentToken: 'invalid' })).rejects.toMatchObject({
-      status: 404,
-    });
-  });
+  it.each(['invalid', 'revoked', 'archived', 'expired'])(
+    'propagates the same neutral invitation error for %s access',
+    async () => {
+      const { invitations, service } = setup();
+      jest
+        .mocked(invitations.resolveAccess)
+        .mockRejectedValue(new ApiError(404, 'INVITATION_NOT_FOUND', 'Invitation not found'));
+      await expect(service.current({ permanentToken: 'invalid' })).rejects.toMatchObject({
+        status: 404,
+      });
+    },
+  );
 });
 
 describe('RsvpRateLimiter', () => {

@@ -1,0 +1,1 @@
+CREATE INDEX "rsvps_updated_at_index" ON "rsvps" USING btree ("updated_at");
