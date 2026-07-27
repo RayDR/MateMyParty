@@ -37,7 +37,10 @@ function setup(maximumAttempts = 100) {
   const service = new InvitationLookupService(
     repository as unknown as InvitationsRepository,
     new InvitationTokenService(),
-    new InvitationLookupRateLimiter(maximumAttempts, 600_000),
+    InvitationLookupRateLimiter.createForTesting({
+      maximumAttempts,
+      windowMilliseconds: 600_000,
+    }),
   );
   return { repository, service };
 }
