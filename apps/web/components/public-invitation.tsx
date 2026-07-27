@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import type {
   CalendarEvent,
   PrivateInvitation as PrivateInvitationData,
@@ -152,17 +159,23 @@ export function PublicInvitation({
           <LanguageSelector locale={locale} dictionary={dictionary} onChange={setLocale} />
         </header>
         {phase !== 'full' ? (
-          <>
-            <article className="invitation-front invitation-closed-card mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950 shadow-2xl">
-              {event.presentation.thumbnailRef ? (
-                <img
-                  src={event.presentation.thumbnailRef}
-                  alt={content.thumbnailAltText}
-                  className="aspect-[4/3] w-full object-cover"
-                />
-              ) : (
-                <div className="aspect-[4/3] bg-[radial-gradient(circle_at_50%_30%,#155e75,#172554_48%,#020617)]" />
-              )}
+          <article className="invitation-front invitation-closed-card group/front mx-auto mt-8 max-w-2xl overflow-hidden rounded-[2rem] border border-amber-200/25 bg-slate-950 shadow-2xl">
+            <div
+              className={`relative overflow-hidden transition-all duration-500 ${
+                phase === 'closed' ? 'rounded-b-[2rem]' : ''
+              }`}
+            >
+              <div className="aspect-[4/3] w-full">
+                {event.presentation.thumbnailRef ? (
+                  <img
+                    src={event.presentation.thumbnailRef}
+                    alt={content.thumbnailAltText}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="size-full bg-[radial-gradient(circle_at_50%_30%,#155e75,#172554_48%,#020617)]" />
+                )}
+              </div>
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent px-5 text-center">
                 <h1 className="text-4xl font-black text-balance drop-shadow-2xl @md:text-6xl">
                   {content.celebrantName}
@@ -195,21 +208,14 @@ export function PublicInvitation({
                       {dictionary.invitation.openInvitation}
                     </span>
                   </div>
-                ) : (
-                  <div
-                    aria-hidden
-                    className="invitation-envelope-opened mt-5 flex size-16 items-center justify-center rounded-full border border-amber-200/45 bg-slate-950/40 text-amber-200"
-                  >
-                    <MailOpen size={28} />
-                  </div>
-                )}
+                ) : null}
               </div>
-            </article>
+            </div>
             {phase === 'summary' ? (
               <section
                 ref={summary}
                 aria-label={dictionary.invitation.youAreInvited}
-                className="invitation-summary mx-auto mt-5 max-w-2xl scroll-mt-4 rounded-[2rem] border border-white/15 bg-slate-950/82 px-5 py-7 text-center shadow-2xl backdrop-blur-xl @md:px-10 @md:py-9"
+                className="invitation-summary scroll-mt-4 border-t border-white/10 bg-slate-950/82 px-5 py-7 text-center backdrop-blur-xl @md:px-10 @md:py-9"
               >
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-200">
                   {dictionary.invitation.youAreInvited}
@@ -217,6 +223,23 @@ export function PublicInvitation({
                 <h2 className="mt-3 text-2xl font-black text-white @md:text-3xl">
                   {invitation.guestDisplayName}
                 </h2>
+                <div className="mt-4 space-y-2 text-sm text-slate-200">
+                  {venueName ? <p className="font-bold">{venueName}</p> : null}
+                  {address ? <p>{address}</p> : null}
+                </div>
+                <div className="mt-4 flex justify-center gap-3">
+                  {invitation.tools.maps ? (
+                    <MapActions maps={invitation.tools.maps} dictionary={dictionary} compact />
+                  ) : null}
+                  <CalendarActions
+                    calendar={calendar}
+                    locale={locale}
+                    dictionary={dictionary}
+                    accessToken={accessToken}
+                    preview={preview}
+                    compact
+                  />
+                </div>
                 {hostMessage ? (
                   <RichText
                     value={hostMessage}
@@ -238,11 +261,11 @@ export function PublicInvitation({
                   className="mx-auto mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-amber-300 px-6 py-3 font-black text-slate-950 shadow-xl hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
                 >
                   <MailOpen aria-hidden size={19} />
-                  {dictionary.invitation.openInvitation}
+                  {dictionary.invitation.eventDetails}
                 </button>
               </section>
             ) : null}
-          </>
+          </article>
         ) : (
           <article
             className={`invitation-back invitation-opening-${event.presentation.mode.toLowerCase()} relative mx-auto mt-5 overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/80 shadow-2xl backdrop-blur-xl`}
@@ -329,12 +352,13 @@ export function PublicInvitation({
             </div>
           </article>
         )}
-        {phase === 'full' ? (
+        {phase !== 'closed' ? (
           <RsvpPanel
             invitation={invitation}
             dictionary={dictionary}
             accessToken={accessToken}
             preview={preview}
+            useAbsolutePositioning={preview}
           />
         ) : null}
       </div>
@@ -376,11 +400,13 @@ function RsvpPanel({
   dictionary,
   accessToken,
   preview,
+  useAbsolutePositioning = false,
 }: {
   invitation: PrivateInvitationData;
   dictionary: Dictionary;
   accessToken?: string;
   preview: boolean;
+  useAbsolutePositioning?: boolean;
 }) {
   const [response, setResponse] = useState<PublicRsvpResponse | null>(invitation.rsvp);
   const [editing, setEditing] = useState(!invitation.rsvp);
@@ -455,7 +481,7 @@ function RsvpPanel({
         <section
           role="dialog"
           aria-labelledby="rsvp-panel-title"
-          className={`${preview ? 'absolute' : 'fixed'} invitation-rsvp-panel inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-h-[min(68dvh,42rem)] max-w-2xl overflow-y-auto rounded-3xl border border-cyan-300/20 bg-slate-950/96 p-5 shadow-2xl backdrop-blur-xl @md:p-7`}
+          className={`${useAbsolutePositioning ? 'absolute' : 'fixed'} invitation-rsvp-panel inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-h-[min(68dvh,42rem)] max-w-2xl overflow-y-auto rounded-3xl border border-cyan-300/20 bg-slate-950/96 p-5 shadow-2xl backdrop-blur-xl @md:p-7`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -636,7 +662,7 @@ function RsvpPanel({
       ) : null}
       <footer
         aria-label={dictionary.invitation.rsvpTitle}
-        className={`${preview ? 'absolute' : 'fixed'} invitation-rsvp-footer inset-x-0 bottom-0 z-40 border-t border-white/15 bg-slate-950/92 px-3 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] shadow-[0_-1rem_3rem_rgb(2_6_23_/_35%)] backdrop-blur-xl`}
+        className={`${useAbsolutePositioning ? 'absolute' : 'fixed'} invitation-rsvp-footer inset-x-0 bottom-0 z-40 border-t border-white/15 bg-slate-950/92 px-3 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] shadow-[0_-1rem_3rem_rgb(2_6_23_/_35%)] backdrop-blur-xl`}
       >
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <p className="mr-auto hidden min-w-0 text-sm font-bold text-cyan-100 @sm:block">
@@ -741,9 +767,11 @@ function RsvpQuickAction({
 function MapActions({
   maps,
   dictionary,
+  compact = false,
 }: {
   maps: PrivateInvitationData['tools']['maps'] & object;
   dictionary: Dictionary;
+  compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   async function copyAddress() {
@@ -752,6 +780,24 @@ function MapActions({
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
+  const primaryUrl = maps.configuredMapsUrl ?? maps.googleMapsUrl ?? maps.appleMapsUrl;
+
+  if (compact) {
+    if (!primaryUrl) return null;
+    return (
+      <a
+        href={primaryUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={dictionary.invitation.directions}
+        aria-label={dictionary.invitation.directions}
+        className="inline-flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/10"
+      >
+        <MapPin aria-hidden size={19} />
+      </a>
+    );
+  }
+
   return (
     <section aria-label={dictionary.invitation.address}>
       <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
@@ -830,16 +876,18 @@ function CalendarActions({
   locale,
   dictionary,
   accessToken,
+  compact = false,
   preview,
 }: {
   calendar: CalendarEvent;
   locale: Locale;
   dictionary: Dictionary;
   accessToken?: string;
+  compact?: boolean;
   preview: boolean;
 }) {
   const [error, setError] = useState(false);
-  async function download() {
+  async function download(event: MouseEvent<HTMLButtonElement>) {
     if (preview) return;
     setError(false);
     const response = await fetch(`/internal/calendar/ics?locale=${locale}`, {
@@ -850,6 +898,7 @@ function CalendarActions({
       setError(true);
       return;
     }
+    event.currentTarget.closest('details')?.removeAttribute('open');
     const url = window.URL.createObjectURL(await response.blob());
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -862,7 +911,7 @@ function CalendarActions({
       <summary
         title={dictionary.invitation.calendarTitle}
         aria-label={dictionary.invitation.calendarTitle}
-        className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/10"
+        className={`flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/10 ${compact ? '' : 'shrink-0'}`}
       >
         <CalendarPlus aria-hidden size={19} />
       </summary>
@@ -878,7 +927,7 @@ function CalendarActions({
         <button
           type="button"
           disabled={preview}
-          onClick={() => void download()}
+          onClick={(event) => void download(event)}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
         >
           <CalendarPlus aria-hidden size={18} />
@@ -887,7 +936,7 @@ function CalendarActions({
         <button
           type="button"
           disabled={preview}
-          onClick={() => void download()}
+          onClick={(event) => void download(event)}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Download aria-hidden size={18} />

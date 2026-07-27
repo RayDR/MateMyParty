@@ -121,7 +121,7 @@ export const ThemedInvitationStage = forwardRef<InvitationMediaHandle, ThemedInv
 
     return (
       <main
-        className={`@container relative min-h-screen overflow-hidden bg-slate-950 text-white template-${presentation.mode.toLowerCase()}`}
+        className={`@container relative min-h-[100dvh] overflow-hidden bg-slate-950 text-white template-${presentation.mode.toLowerCase()}`}
         data-presentation-mode={presentation.mode}
         data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
       >

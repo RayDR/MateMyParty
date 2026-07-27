@@ -10,3 +10,4 @@ coverage
 !.env.production.example
 *.tsbuildinfo
 .DS_Store
+.deploy-backup-*

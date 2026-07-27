@@ -21,7 +21,7 @@ describe('protected host presentation preview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
     expect(screen.getByText('Family Sample')).toBeInTheDocument();
     expect(playSpy).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Open invitation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Event details' }));
     expect(screen.getByRole('button', { name: "Yes, we'll be there" })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Tablet' }));
     expect(screen.getByTestId('preview-viewport')).toHaveAttribute('data-viewport', 'tablet');
