@@ -15,9 +15,9 @@ function openSummary(label = 'Open invitation') {
   fireEvent.click(screen.getByRole('button', { name: label }));
 }
 
-function openFullInvitation(label = 'Open invitation') {
-  openSummary(label);
-  fireEvent.click(screen.getByRole('button', { name: label }));
+function openFullInvitation(openLabel = 'Open invitation', detailsLabel = 'Event details') {
+  openSummary(openLabel);
+  fireEvent.click(screen.getByRole('button', { name: detailsLabel }));
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -69,9 +69,9 @@ describe('/i/[token] content', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText('When')).not.toBeInTheDocument();
     expect(screen.queryByText(/1:00 PM/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/123 Celebration Lane/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open invitation' })).toBeVisible();
+    expect(screen.queryByText(/123 Celebration Lane/)).toBeInTheDocument();
+    expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Event details' })).toBeVisible();
   });
 
   it('reveals compact essential details on the second action without restarting music', () => {
@@ -145,7 +145,7 @@ describe('/i/[token] content', () => {
     openSummary();
     expect(container.querySelector('[data-reduced-motion="true"]')).toBeInTheDocument();
     expect(container.querySelector('.celebration-flight')).not.toBeInTheDocument();
-    expect(container.querySelector('.invitation-envelope-opened')).toBeInTheDocument();
+    expect(container.querySelector('.invitation-envelope-opened')).not.toBeInTheDocument();
     expect(container.querySelector('[data-invitation-phase="summary"]')).toBeInTheDocument();
   });
 
@@ -177,7 +177,7 @@ describe('/i/[token] content', () => {
     expect(screen.getByRole('heading', { name: 'Family Sample' })).toBeVisible();
     expect(screen.getByText('Nos encantará celebrar contigo.')).toBeInTheDocument();
     expect(screen.queryByText('We cannot wait to celebrate with you.')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir invitación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Detalles del evento' }));
     expect(screen.getByRole('heading', { name: 'Sexto cumpleaños de Raymundo' })).toBeVisible();
     expect(screen.getByText('Cuándo')).toBeVisible();
     expect(screen.getByText('Dónde')).toBeVisible();
