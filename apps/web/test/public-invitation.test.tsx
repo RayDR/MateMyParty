@@ -109,6 +109,13 @@ describe('/i/[token] content', () => {
     );
     expect(container.querySelector('.invitation-essential')?.closest('details')).toBeNull();
     expect(screen.getByRole('contentinfo', { name: 'RSVP' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Pause video + Pause theme audio' })).toHaveAttribute(
+      'title',
+      'Pause video + Pause theme audio',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preparing the celebration…' }));
+
     expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute('title', 'Pause');
     expect(screen.getByRole('button', { name: 'Replay' })).toHaveAttribute('title', 'Replay');
     expect(screen.getByRole('button', { name: 'Unmute video' })).toHaveAttribute(

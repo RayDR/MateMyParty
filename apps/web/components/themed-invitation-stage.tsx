@@ -11,7 +11,7 @@ import {
 } from 'react';
 import type { InvitationPresentation } from '@matemyparty/contracts';
 import type { Dictionary } from '@matemyparty/i18n';
-import { Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Pause, Play, RotateCcw, SlidersHorizontal, Volume2, VolumeX } from 'lucide-react';
 
 export type InvitationMediaHandle = {
   unlockAudio: () => Promise<boolean>;
@@ -51,6 +51,7 @@ export const ThemedInvitationStage = forwardRef<InvitationMediaHandle, ThemedInv
     const [videoMuted, setVideoMuted] = useState(true);
     const [audioPlaying, setAudioPlaying] = useState(false);
     const [audioMuted, setAudioMuted] = useState(false);
+    const [controlsOpen, setControlsOpen] = useState(false);
     const video = useRef<HTMLVideoElement>(null);
     const audio = useRef<HTMLAudioElement>(null);
 
@@ -119,9 +120,33 @@ export const ThemedInvitationStage = forwardRef<InvitationMediaHandle, ThemedInv
       }
     }
 
+    async function toggleAllMedia() {
+      const videoIsPlaying = Boolean(video.current && !video.current.paused);
+      const audioIsPlaying = Boolean(audio.current && !audio.current.paused);
+
+      if (videoIsPlaying || audioIsPlaying) {
+        video.current?.pause();
+        audio.current?.pause();
+        setVideoPaused(true);
+        setAudioPlaying(false);
+        return;
+      }
+
+      if (video.current) {
+        await video.current.play().catch(() => undefined);
+        setVideoPaused(false);
+      }
+      if (audio.current && mediaUnlocked) {
+        await playAudio();
+      }
+    }
+
+    const allMediaPaused =
+      (!showVideo || videoPaused) && (!presentation.audioRef || !mediaUnlocked || !audioPlaying);
+
     return (
       <main
-        className={`@container relative min-h-screen overflow-hidden bg-slate-950 text-white template-${presentation.mode.toLowerCase()}`}
+        className={`@container relative min-h-[100dvh] w-full max-w-full overflow-x-clip overflow-y-hidden bg-slate-950 text-white template-${presentation.mode.toLowerCase()}`}
         data-presentation-mode={presentation.mode}
         data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
       >
@@ -179,75 +204,120 @@ export const ThemedInvitationStage = forwardRef<InvitationMediaHandle, ThemedInv
         {(!privateExperience || mediaUnlocked) &&
         (showVideo || Boolean(presentation.audioRef && !mediaDisabled)) ? (
           <div
-            className={`${containedControls ? (privateExperience && controlsRaised ? 'absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))]' : 'absolute bottom-3') : privateExperience && controlsRaised ? 'fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))]' : 'fixed bottom-3'} invitation-media-controls inset-x-0 z-30 mx-auto flex w-fit max-w-[calc(100%-1.5rem)] flex-wrap justify-center gap-2 rounded-full border border-white/15 bg-slate-950/82 p-2 shadow-xl backdrop-blur`}
+            className={`${containedControls ? 'absolute' : 'fixed'} ${
+              controlsRaised ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))]' : 'bottom-3'
+            } invitation-media-controls right-3 left-auto z-30 flex w-fit max-w-[calc(100dvw-1.5rem)] items-center gap-2`}
           >
-            {showVideo ? (
-              <>
-                <Control
-                  onClick={() => void toggleVideo()}
-                  label={videoPaused ? dictionary.invitation.play : dictionary.invitation.pause}
-                  pressed={!videoPaused}
-                  icon={
-                    videoPaused ? <Play aria-hidden size={17} /> : <Pause aria-hidden size={17} />
-                  }
-                />
-                <Control
-                  onClick={() => void replayVideo()}
-                  label={dictionary.invitation.replay}
-                  icon={<RotateCcw aria-hidden size={17} />}
-                />
-                <Control
-                  onClick={() => {
-                    if (video.current) video.current.muted = !videoMuted;
-                    setVideoMuted((current) => !current);
-                  }}
-                  label={
-                    videoMuted ? dictionary.invitation.unmuteVideo : dictionary.invitation.muteVideo
-                  }
-                  pressed={videoMuted}
-                  icon={
-                    videoMuted ? (
-                      <VolumeX aria-hidden size={17} />
-                    ) : (
-                      <Volume2 aria-hidden size={17} />
-                    )
-                  }
-                />
-              </>
+            {controlsOpen ? (
+              <div className="absolute right-0 bottom-full mb-2 flex w-[min(17rem,calc(100dvw-1.5rem))] flex-wrap items-center justify-end gap-2 rounded-3xl border border-white/15 bg-slate-950/92 p-2 shadow-xl backdrop-blur">
+                {showVideo ? (
+                  <>
+                    <Control
+                      onClick={() => void toggleVideo()}
+                      label={videoPaused ? dictionary.invitation.play : dictionary.invitation.pause}
+                      pressed={!videoPaused}
+                      icon={
+                        videoPaused ? (
+                          <Play aria-hidden size={17} />
+                        ) : (
+                          <Pause aria-hidden size={17} />
+                        )
+                      }
+                    />
+                    <Control
+                      onClick={() => void replayVideo()}
+                      label={dictionary.invitation.replay}
+                      icon={<RotateCcw aria-hidden size={17} />}
+                    />
+                    <Control
+                      onClick={() => {
+                        if (video.current) video.current.muted = !videoMuted;
+                        setVideoMuted((current) => !current);
+                      }}
+                      label={
+                        videoMuted
+                          ? dictionary.invitation.unmuteVideo
+                          : dictionary.invitation.muteVideo
+                      }
+                      pressed={videoMuted}
+                      icon={
+                        videoMuted ? (
+                          <VolumeX aria-hidden size={17} />
+                        ) : (
+                          <Volume2 aria-hidden size={17} />
+                        )
+                      }
+                    />
+                  </>
+                ) : null}
+
+                {presentation.audioRef && !mediaDisabled && mediaUnlocked ? (
+                  <>
+                    <Control
+                      onClick={() => void toggleAudio()}
+                      label={
+                        audioPlaying
+                          ? dictionary.invitation.pauseMusic
+                          : dictionary.invitation.playMusic
+                      }
+                      pressed={audioPlaying}
+                      icon={
+                        audioPlaying ? (
+                          <Pause aria-hidden size={17} />
+                        ) : (
+                          <Play aria-hidden size={17} />
+                        )
+                      }
+                    />
+                    <Control
+                      onClick={() => {
+                        if (audio.current) audio.current.muted = !audioMuted;
+                        setAudioMuted((current) => !current);
+                      }}
+                      label={
+                        audioMuted
+                          ? dictionary.invitation.unmuteMusic
+                          : dictionary.invitation.muteMusic
+                      }
+                      pressed={audioMuted}
+                      icon={
+                        audioMuted ? (
+                          <VolumeX aria-hidden size={17} />
+                        ) : (
+                          <Volume2 aria-hidden size={17} />
+                        )
+                      }
+                    />
+                  </>
+                ) : null}
+              </div>
             ) : null}
-            {presentation.audioRef && !mediaDisabled && mediaUnlocked ? (
-              <>
-                <Control
-                  onClick={() => void toggleAudio()}
-                  label={
-                    audioPlaying
-                      ? dictionary.invitation.pauseMusic
-                      : dictionary.invitation.playMusic
-                  }
-                  pressed={audioPlaying}
-                  icon={
-                    audioPlaying ? <Pause aria-hidden size={17} /> : <Play aria-hidden size={17} />
-                  }
-                />
-                <Control
-                  onClick={() => {
-                    if (audio.current) audio.current.muted = !audioMuted;
-                    setAudioMuted((current) => !current);
-                  }}
-                  label={
-                    audioMuted ? dictionary.invitation.unmuteMusic : dictionary.invitation.muteMusic
-                  }
-                  pressed={audioMuted}
-                  icon={
-                    audioMuted ? (
-                      <VolumeX aria-hidden size={17} />
-                    ) : (
-                      <Volume2 aria-hidden size={17} />
-                    )
-                  }
-                />
-              </>
-            ) : null}
+
+            <div className="flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/88 p-2 shadow-xl backdrop-blur">
+              <Control
+                onClick={() => void toggleAllMedia()}
+                label={
+                  allMediaPaused
+                    ? `${dictionary.invitation.play} video + ${dictionary.invitation.playMusic}`
+                    : `${dictionary.invitation.pause} video + ${dictionary.invitation.pauseMusic}`
+                }
+                pressed={!allMediaPaused}
+                icon={
+                  allMediaPaused ? <Play aria-hidden size={18} /> : <Pause aria-hidden size={18} />
+                }
+              />
+
+              <button
+                type="button"
+                title={dictionary.invitation.mediaLoading}
+                aria-label={dictionary.invitation.mediaLoading}
+                aria-expanded={controlsOpen}
+                onClick={() => setControlsOpen((current) => !current)}
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-cyan-300"
+              >
+                <SlidersHorizontal aria-hidden size={18} />
+              </button>
+            </div>
           </div>
         ) : null}
       </main>
