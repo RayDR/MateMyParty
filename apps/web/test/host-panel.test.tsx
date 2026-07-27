@@ -218,6 +218,7 @@ describe('host guest management screen', () => {
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     await screen.findByRole('heading', { name: 'Family Sample' });
     await userEvent.click(screen.getByRole('button', { name: 'Add a guest or family' }));
+    expect(screen.getByRole('dialog', { name: 'Add a guest or family' })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Guest or family name'), 'New Family');
     const total = screen.getByLabelText('Total invited');
     await userEvent.clear(total);

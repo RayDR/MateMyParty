@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   eventMediaReferenceSchema,
+  eventThumbnailReferenceSchema,
   eventTemplateKeySchema,
   publicEventThumbnailReferenceSchema,
   supportedEventLocaleSchema,
@@ -23,7 +24,7 @@ export const invitationPresentationSchema = z.object({
   videoRef: eventMediaReferenceSchema.nullable(),
   audioRef: eventMediaReferenceSchema.nullable(),
   staticFallbackRef: eventMediaReferenceSchema.nullable(),
-  thumbnailRef: eventMediaReferenceSchema.nullable(),
+  thumbnailRef: eventThumbnailReferenceSchema.nullable(),
   overlayIntensity: z.number().int().min(0).max(100),
 });
 

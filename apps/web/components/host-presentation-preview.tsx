@@ -5,6 +5,7 @@ import type { HostPresentationPreview as HostPresentationPreviewData } from '@ma
 import { getDictionary, type Locale } from '@matemyparty/i18n';
 import { EventInvitation } from './event-invitation';
 import { PublicInvitation } from './public-invitation';
+import { usePersistentLocale } from '../lib/use-persistent-locale';
 
 type Experience = 'public' | 'private';
 type Viewport = 'mobile' | 'tablet' | 'desktop';
@@ -22,7 +23,7 @@ export function HostPresentationPreview({
   preview: HostPresentationPreviewData;
   identifier: string;
 }) {
-  const [locale, setLocale] = useState<Locale>(preview.landing.defaultLocale);
+  const [locale, setLocale] = usePersistentLocale(preview.landing.defaultLocale);
   const [experience, setExperience] = useState<Experience>('public');
   const [viewport, setViewport] = useState<Viewport>('mobile');
   const [mediaDisabled, setMediaDisabled] = useState(false);

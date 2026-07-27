@@ -1,3 +1,4 @@
+import { richTextToHtml, richTextToPlainText } from '@matemyparty/contracts';
 import type { eventLocalizations, events } from '@matemyparty/database';
 import type { Locale } from '@matemyparty/i18n';
 
@@ -49,7 +50,7 @@ export function renderInvitationEmail(input: {
     title: escapeHtml(safeTitle),
     date: escapeHtml(date),
     location: escapeHtml(location),
-    hostMessage: escapeHtml(hostMessage?.slice(0, 4000) ?? ''),
+    hostMessage: hostMessage ? richTextToHtml(hostMessage.slice(0, 4000)) : '',
     url: escapeHtml(invitationUrl),
     thumbnail: publicThumbnailUrl ? escapeHtml(publicThumbnailUrl) : null,
     alt: escapeHtml(localization?.thumbnailAltText ?? safeTitle),
@@ -66,7 +67,7 @@ ${escaped.thumbnail ? `<tr><td><img src="${escaped.thumbnail}" width="600" alt="
 <h1 class="email-title" style="margin:0 0 20px;color:#ffffff;font-size:38px;line-height:1.15">${escaped.title}</h1>
 <p style="margin:0 0 18px;color:#e2e8f0;font-size:18px;line-height:1.6">${escapeHtml(copy.introduction)}</p>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;background:#172554;border-radius:14px"><tr><td style="padding:18px;color:#dbeafe;font-size:15px;line-height:1.6"><strong>${escapeHtml(copy.dateLabel)}:</strong> ${escaped.date}${escaped.location ? `<br><strong>${escapeHtml(copy.venueLabel)}:</strong> ${escaped.location}` : ''}</td></tr></table>
-${escaped.hostMessage ? `<p style="margin:0 0 22px;color:#e2e8f0;font-size:16px;line-height:1.6">${escaped.hostMessage}</p>` : ''}
+${escaped.hostMessage ? `<div style="margin:0 0 22px;color:#e2e8f0;font-size:16px;line-height:1.6">${escaped.hostMessage}</div>` : ''}
 <p style="margin:26px 0;text-align:center"><a href="${escaped.url}" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-size:17px;font-weight:bold;padding:15px 28px;border-radius:12px">${escapeHtml(copy.cta)}</a></p>
 <p style="margin:18px 0 0;color:#94a3b8;font-size:13px;line-height:1.6">${escapeHtml(copy.fallback)}<br><a href="${escaped.url}" style="color:#67e8f9;word-break:break-all">${escaped.url}</a></p>
 <p style="margin:30px 0 0;padding-top:18px;border-top:1px solid #334155;color:#64748b;font-size:11px;line-height:1.5">${escapeHtml(copy.footer)}</p>
@@ -77,7 +78,7 @@ ${escaped.hostMessage ? `<p style="margin:0 0 22px;color:#e2e8f0;font-size:16px;
     copy.introduction,
     `${copy.dateLabel}: ${date}`,
     ...(location ? [`${copy.venueLabel}: ${location}`] : []),
-    ...(hostMessage ? ['', hostMessage.slice(0, 4000)] : []),
+    ...(hostMessage ? ['', richTextToPlainText(hostMessage.slice(0, 4000))] : []),
     '',
     copy.rsvp,
     invitationUrl,

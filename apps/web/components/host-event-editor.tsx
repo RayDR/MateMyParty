@@ -10,11 +10,13 @@ import { hostCalendarPreviewSchema } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
 import { statusLabel, templateLabel } from './host-dashboard';
+import { RichTextEditor } from './rich-text-editor';
+import { usePersistentLocale } from '../lib/use-persistent-locale';
 
 type LocalizedContent = HostEventDetail['localizedContent']['en-US'];
 
 export function HostEventEditor({ identifier }: { identifier: string }) {
-  const [locale, setLocale] = useState<Locale>('en-US');
+  const [locale, setLocale] = usePersistentLocale('en-US');
   const [contentLocale, setContentLocale] = useState<Locale>('en-US');
   const [draft, setDraft] = useState<HostEventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,6 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
       .then((event) => {
         if (!active) return;
         setDraft(event);
-        setLocale(event.defaultLocale);
         setContentLocale(event.defaultLocale);
       })
       .catch(() => {
@@ -215,6 +216,7 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
             locale={contentLocale}
             setLocale={setContentLocale}
             dictionary={dictionary}
+            content={draft.localizedContent}
           />
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <TextField
@@ -271,10 +273,11 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
                 change((current) => ({ ...current, defaultLocale: value as Locale }))
               }
             />
-            <TextAreaField
+            <RichTextEditor
               label={dictionary.host.hostMessageLabel}
               value={content.hostMessage ?? ''}
               onChange={(value) => changeLocalized('hostMessage', emptyToNull(value))}
+              dictionary={dictionary}
               className="md:col-span-2"
             />
           </div>
@@ -409,16 +412,18 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
                 }))
               }
             />
-            <TextAreaField
+            <RichTextEditor
               label={dictionary.host.arrivalInstructions}
               value={content.arrivalInstructions ?? ''}
               onChange={(value) => changeLocalized('arrivalInstructions', emptyToNull(value))}
+              dictionary={dictionary}
               className="md:col-span-2"
             />
-            <TextAreaField
+            <RichTextEditor
               label={dictionary.host.parkingInstructions}
               value={content.parkingInstructions ?? ''}
               onChange={(value) => changeLocalized('parkingInstructions', emptyToNull(value))}
+              dictionary={dictionary}
               className="md:col-span-2"
             />
           </div>
@@ -455,22 +460,26 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
               </p>
               {calendarPreview.maps ? (
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <a
-                    href={calendarPreview.maps.googleMapsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-xl bg-cyan-600 px-4 py-3 text-sm font-bold"
-                  >
-                    {dictionary.invitation.googleMaps}
-                  </a>
-                  <a
-                    href={calendarPreview.maps.appleMapsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold"
-                  >
-                    {dictionary.invitation.appleMaps}
-                  </a>
+                  {calendarPreview.maps.googleMapsUrl ? (
+                    <a
+                      href={calendarPreview.maps.googleMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-cyan-600 px-4 py-3 text-sm font-bold"
+                    >
+                      {dictionary.invitation.googleMaps}
+                    </a>
+                  ) : null}
+                  {calendarPreview.maps.appleMapsUrl ? (
+                    <a
+                      href={calendarPreview.maps.appleMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold"
+                    >
+                      {dictionary.invitation.appleMaps}
+                    </a>
+                  ) : null}
                 </div>
               ) : null}
             </Card>
@@ -679,10 +688,12 @@ function LanguageTabs({
   locale,
   setLocale,
   dictionary,
+  content,
 }: {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   dictionary: Dictionary;
+  content: HostEventDetail['localizedContent'];
 }) {
   return (
     <div className="mt-4 flex items-center gap-2" aria-label={dictionary.host.editingLanguage}>
@@ -697,7 +708,14 @@ function LanguageTabs({
             locale === value ? 'bg-cyan-500 text-slate-950' : 'bg-white/10'
           }`}
         >
-          {value === 'en-US' ? 'EN' : 'ES'}
+          <span>{value === 'en-US' ? 'EN' : 'ES'}</span>
+          <span className="ml-2 text-xs font-medium opacity-75">
+            {content[value].title.trim() &&
+            content[value].celebrantName.trim() &&
+            content[value].thumbnailAltText.trim()
+              ? dictionary.host.languageComplete
+              : dictionary.host.languageIncomplete}
+          </span>
         </button>
       ))}
     </div>
@@ -744,30 +762,6 @@ function TextField({
         step={step}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
-      />
-    </label>
-  );
-}
-
-function TextAreaField({
-  label,
-  value,
-  onChange,
-  className = '',
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-}) {
-  return (
-    <label className={`text-sm text-slate-200 ${className}`}>
-      <span>{label}</span>
-      <textarea
-        value={value}
-        rows={4}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
       />
     </label>
   );
