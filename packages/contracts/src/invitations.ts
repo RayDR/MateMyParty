@@ -1,8 +1,15 @@
 import { z } from 'zod';
-import { publicEventSchema } from './events.js';
+import {
+  eventMediaReferenceSchema,
+  publicEventSchema,
+  publicEventThumbnailReferenceSchema,
+} from './events.js';
+import { calendarEventSchema, mapLinksSchema } from './event-tools.js';
+import { hostRsvpSummarySchema, publicRsvpResponseSchema } from './rsvp.js';
 
 export const supportedLocaleSchema = z.enum(['en-US', 'es-MX']);
 export const preferredChannelSchema = z.enum(['EMAIL', 'SMS', 'BOTH', 'MANUAL']);
+export const invitationCountModeSchema = z.enum(['TOTAL_ONLY', 'ADULTS_AND_CHILDREN']);
 export const invitationStatusSchema = z.enum(['DRAFT', 'READY', 'SENT', 'OPENED', 'REVOKED']);
 
 const optionalTrimmedString = (maximum: number) =>
@@ -16,19 +23,39 @@ export function normalizePhone(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-export const createGuestInputSchema = z
-  .object({
-    displayName: z.string().trim().min(1).max(160),
-    contactName: optionalTrimmedString(160),
-    email: z.string().trim().toLowerCase().email().max(254).optional().nullable(),
-    phone: z.string().trim().min(3).max(40).transform(normalizePhone).optional().nullable(),
-    preferredChannel: preferredChannelSchema,
-    locale: supportedLocaleSchema,
-    adultsPlanned: z.number().int().nonnegative().max(100).optional().nullable(),
-    childrenPlanned: z.number().int().nonnegative().max(100).optional().nullable(),
-    privateNotes: optionalTrimmedString(2000),
-  })
+const guestInputObjectSchema = z.object({
+  displayName: z.string().trim().min(1).max(160),
+  contactName: optionalTrimmedString(160),
+  email: z.string().trim().toLowerCase().email().max(254).optional().nullable(),
+  phone: z.string().trim().min(3).max(40).transform(normalizePhone).optional().nullable(),
+  preferredChannel: preferredChannelSchema,
+  locale: supportedLocaleSchema,
+  invitationCountMode: invitationCountModeSchema,
+  totalInvited: z.number().int().nonnegative().max(200).optional().nullable(),
+  adultsInvited: z.number().int().nonnegative().max(100).optional().nullable(),
+  childrenInvited: z.number().int().nonnegative().max(100).optional().nullable(),
+  privateNotes: optionalTrimmedString(2000),
+});
+
+export const createGuestInputSchema = guestInputObjectSchema
   .superRefine((value, context) => {
+    if (value.invitationCountMode === 'TOTAL_ONLY' && value.totalInvited == null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['totalInvited'],
+        message: 'Total invited is required for TOTAL_ONLY',
+      });
+    }
+    if (
+      value.invitationCountMode === 'ADULTS_AND_CHILDREN' &&
+      (value.adultsInvited == null || value.childrenInvited == null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['adultsInvited'],
+        message: 'Adult and child counts are required for ADULTS_AND_CHILDREN',
+      });
+    }
     if (value.preferredChannel === 'EMAIL' && !value.email)
       context.addIssue({ code: 'custom', path: ['email'], message: 'Email is required for EMAIL' });
     if (value.preferredChannel === 'SMS' && !value.phone)
@@ -45,34 +72,29 @@ export const createGuestInputSchema = z
         path: ['preferredChannel'],
         message: 'MANUAL cannot include email or phone',
       });
+  })
+  .transform((value) => {
+    if (value.invitationCountMode === 'TOTAL_ONLY') {
+      return {
+        ...value,
+        totalInvited: value.totalInvited!,
+        adultsInvited: null,
+        childrenInvited: null,
+      };
+    }
+    return {
+      ...value,
+      totalInvited: value.adultsInvited! + value.childrenInvited!,
+      adultsInvited: value.adultsInvited!,
+      childrenInvited: value.childrenInvited!,
+    };
   });
 
-export const createGuestRequestSchema = z.object({
-  displayName: z.string(),
-  contactName: z.string().optional().nullable(),
-  email: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  preferredChannel: preferredChannelSchema,
-  locale: supportedLocaleSchema,
-  adultsPlanned: z.number().optional().nullable(),
-  childrenPlanned: z.number().optional().nullable(),
-  privateNotes: z.string().optional().nullable(),
+export const createGuestRequestSchema = guestInputObjectSchema.extend({
   createInvitation: z.boolean().optional().default(false),
 });
 
-export const updateGuestInputSchema = z
-  .object({
-    displayName: z.string().optional(),
-    contactName: z.string().optional().nullable(),
-    email: z.string().optional().nullable(),
-    phone: z.string().optional().nullable(),
-    preferredChannel: preferredChannelSchema.optional(),
-    locale: supportedLocaleSchema.optional(),
-    adultsPlanned: z.number().optional().nullable(),
-    childrenPlanned: z.number().optional().nullable(),
-    privateNotes: z.string().optional().nullable(),
-  })
-  .strict();
+export const updateGuestInputSchema = guestInputObjectSchema.partial().strict();
 
 export const invitationSummarySchema = z.object({
   id: z.uuid(),
@@ -85,6 +107,65 @@ export const invitationSummarySchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   revokedAt: z.iso.datetime().nullable(),
+  rsvp: hostRsvpSummarySchema.nullable().optional(),
+});
+
+export const notificationEligibilitySchema = z.object({
+  canNotifyAutomatically: z.boolean(),
+  canEmail: z.boolean(),
+  canSms: z.boolean(),
+  reason: z.enum(['ELIGIBLE', 'NO_CONTACT', 'NOT_CONFIGURED']),
+});
+
+export const emailDeliveryStatusSchema = z.enum([
+  'QUEUED',
+  'SENDING',
+  'SENT',
+  'DELIVERED',
+  'FAILED',
+  'CANCELLED',
+]);
+
+export const emailDeliveryAttemptSchema = z.object({
+  id: z.uuid(),
+  invitationId: z.uuid(),
+  status: emailDeliveryStatusSchema,
+  provider: z.string().min(1).max(40),
+  providerStatus: z.string().max(80).nullable(),
+  attemptNumber: z.number().int().positive(),
+  locale: supportedLocaleSchema,
+  subject: z.string().min(1).max(200),
+  retryable: z.boolean(),
+  safeErrorCode: z.string().max(80).nullable(),
+  safeErrorMessage: z.string().max(300).nullable(),
+  queuedAt: z.iso.datetime(),
+  sentAt: z.iso.datetime().nullable(),
+  deliveredAt: z.iso.datetime().nullable(),
+  failedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const emailEligibilitySchema = z.object({
+  eligible: z.boolean(),
+  action: z.enum(['GENERATE_AND_SEND', 'REGENERATE_AND_SEND']).nullable(),
+  reason: z.enum([
+    'ELIGIBLE',
+    'GUEST_ARCHIVED',
+    'EMAIL_MISSING',
+    'CHANNEL_NOT_ALLOWED',
+    'INVITATION_REVOKED',
+    'TOKEN_REGENERATION_REQUIRED',
+    'EVENT_NOT_SENDABLE',
+    'EMAIL_NOT_CONFIGURED',
+  ]),
+  requiresRegeneration: z.boolean(),
+});
+
+export const guestEmailDeliverySchema = z.object({
+  eligibility: emailEligibilitySchema,
+  lastAttempt: emailDeliveryAttemptSchema.nullable(),
+  retryAvailable: z.boolean(),
 });
 
 export const hostGuestSchema = z.object({
@@ -95,13 +176,43 @@ export const hostGuestSchema = z.object({
   phone: z.string().nullable(),
   preferredChannel: preferredChannelSchema,
   locale: supportedLocaleSchema,
-  adultsPlanned: z.number().int().nonnegative().nullable(),
-  childrenPlanned: z.number().int().nonnegative().nullable(),
+  invitationCountMode: invitationCountModeSchema,
+  totalInvited: z.number().int().nonnegative(),
+  adultsInvited: z.number().int().nonnegative().nullable(),
+  childrenInvited: z.number().int().nonnegative().nullable(),
   privateNotes: z.string().nullable(),
+  notificationEligibility: notificationEligibilitySchema,
+  emailDelivery: guestEmailDeliverySchema.optional(),
   invitation: invitationSummarySchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   archivedAt: z.iso.datetime().nullable(),
+});
+
+export const guestInvitationStatisticsSchema = z.object({
+  totalGuests: z.number().int().nonnegative(),
+  totalPeopleInvited: z.number().int().nonnegative(),
+  generated: z.number().int().nonnegative(),
+  notGenerated: z.number().int().nonnegative(),
+  opened: z.number().int().nonnegative(),
+  notOpened: z.number().int().nonnegative(),
+  revoked: z.number().int().nonnegative(),
+  notContactable: z.number().int().nonnegative(),
+});
+
+export const invitationSharePreviewSchema = z.object({
+  eventTitle: z.string().min(1).max(180),
+  invitationText: z.string().min(1).max(600),
+  smsText: z.string().min(1).max(480),
+  smsCharacterCount: z.number().int().nonnegative(),
+  hostname: z.string().nullable(),
+  publicUrlTemplate: z.string().min(1),
+  publicThumbnailRef: publicEventThumbnailReferenceSchema.nullable(),
+  thumbnailAltText: z.string().min(1),
+  whatsAppApproximation: z.literal(true),
+  maps: mapLinksSchema.nullable(),
+  calendar: calendarEventSchema,
+  locale: supportedLocaleSchema,
 });
 
 export const createInvitationResultSchema = z.object({
@@ -117,14 +228,23 @@ export const regenerateInvitationResultSchema = z.object({
   newToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 
+export const publicInvitationShareMetadataSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  thumbnailImageRef: eventMediaReferenceSchema.nullable(),
+  thumbnailAltText: z.string().min(1),
+});
+
 export const publicInvitationSchema = z.object({
   event: publicEventSchema,
   guestDisplayName: z.string().min(1),
   status: invitationStatusSchema.exclude(['REVOKED']),
   locale: supportedLocaleSchema,
   openedPreviously: z.boolean(),
+  rsvp: publicRsvpResponseSchema.nullable(),
+  shareMetadata: publicInvitationShareMetadataSchema,
   capabilities: z.object({
-    canRespond: z.literal(false),
+    canRespond: z.boolean(),
     canAddToCalendar: z.literal(false),
   }),
 });
@@ -132,6 +252,13 @@ export const publicInvitationSchema = z.object({
 export type CreateGuestInput = z.infer<typeof createGuestInputSchema>;
 export type HostGuest = z.infer<typeof hostGuestSchema>;
 export type InvitationSummary = z.infer<typeof invitationSummarySchema>;
+export type NotificationEligibility = z.infer<typeof notificationEligibilitySchema>;
+export type EmailDeliveryStatus = z.infer<typeof emailDeliveryStatusSchema>;
+export type EmailDeliveryAttempt = z.infer<typeof emailDeliveryAttemptSchema>;
+export type EmailEligibility = z.infer<typeof emailEligibilitySchema>;
+export type GuestEmailDelivery = z.infer<typeof guestEmailDeliverySchema>;
+export type GuestInvitationStatistics = z.infer<typeof guestInvitationStatisticsSchema>;
+export type InvitationSharePreview = z.infer<typeof invitationSharePreviewSchema>;
 export type CreateInvitationResult = z.infer<typeof createInvitationResultSchema>;
 export type RegenerateInvitationResult = z.infer<typeof regenerateInvitationResultSchema>;
 export type PublicInvitation = z.infer<typeof publicInvitationSchema>;

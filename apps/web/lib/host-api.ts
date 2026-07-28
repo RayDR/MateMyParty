@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { validHostSession } from './host-session';
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+import { publicRequestOrigin } from './public-origin';
+import { internalApiBaseUrl } from './server-api';
 
 export async function forwardHostRequest(
   request: NextRequest,
@@ -21,18 +21,41 @@ export async function forwardHostRequest(
       { status: 503 },
     );
   const body = method === 'GET' || method === 'HEAD' ? undefined : await request.text();
-  const upstream = await fetch(`${apiBaseUrl}${path}`, {
+  const upstream = await fetch(`${internalApiBaseUrl}${path}`, {
     method,
     body,
     cache: 'no-store',
     headers: {
       authorization: `Bearer ${token}`,
       ...(body ? { 'content-type': 'application/json' } : {}),
+      ...(request.headers.get('x-mmp-csrf') === '1' ? { 'x-mmp-csrf': '1' } : {}),
     },
   });
   const responseBody = await upstream.text();
   return new NextResponse(responseBody, {
     status: upstream.status,
-    headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },
+    headers: {
+      'content-type': upstream.headers.get('content-type') ?? 'application/json',
+      'cache-control': 'no-store, private',
+    },
   });
+}
+
+export function rejectInvalidHostMutation(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  try {
+    if (
+      origin &&
+      new URL(origin).origin === publicRequestOrigin(request) &&
+      request.headers.get('x-mmp-csrf') === '1'
+    ) {
+      return null;
+    }
+  } catch {
+    // Return the same neutral rejection for malformed and cross-origin values.
+  }
+  return NextResponse.json(
+    { code: 'CSRF_REJECTED', message: 'Request validation failed', status: 403 },
+    { status: 403 },
+  );
 }

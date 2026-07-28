@@ -1,11 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import {
   eventDomains,
+  eventLocalizations,
   events,
   guests,
+  invitationAccessGrants,
   invitationActivities,
   invitations,
+  rsvps,
   type DatabaseConnection,
   type DatabaseExecutor,
 } from '@matemyparty/database';
@@ -75,6 +78,110 @@ export class InvitationsRepository {
     return rows[0] ?? this.findById(id, executor);
   }
 
+  async revokeAccessGrants(invitationId: string, executor: DatabaseExecutor) {
+    const now = new Date();
+    await executor
+      .update(invitationAccessGrants)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(invitationAccessGrants.invitationId, invitationId),
+          isNull(invitationAccessGrants.revokedAt),
+        ),
+      );
+  }
+
+  async markSent(id: string) {
+    const now = new Date();
+    const rows = await this.connection.db
+      .update(invitations)
+      .set({ status: 'SENT', updatedAt: now })
+      .where(
+        and(eq(invitations.id, id), eq(invitations.status, 'READY'), isNull(invitations.revokedAt)),
+      )
+      .returning();
+    return rows[0] ?? this.findById(id);
+  }
+
+  async findLookupMatch(
+    eventIdentifier: string,
+    displayName: string,
+    method: 'EMAIL' | 'PHONE',
+    contact: string,
+    executor: DatabaseExecutor,
+  ) {
+    const identifier = eventIdentifier.trim();
+    const contactCondition =
+      method === 'EMAIL'
+        ? sql`lower(trim(${guests.email})) = ${contact}`
+        : sql`(case when left(trim(coalesce(${guests.phone}, '')), 1) = '+' then '+' else '' end || regexp_replace(coalesce(${guests.phone}, ''), '[^0-9]', '', 'g')) = ${contact}`;
+    const rows = await executor
+      .select({ invitation: invitations, guest: guests })
+      .from(invitations)
+      .innerJoin(guests, eq(guests.id, invitations.guestId))
+      .innerJoin(events, eq(events.id, invitations.eventId))
+      .where(
+        and(
+          or(
+            sql`lower(${events.publicSlug}) = ${identifier.toLowerCase()}`,
+            eq(events.publicCode, identifier.toUpperCase()),
+          ),
+          sql`lower(regexp_replace(trim(${guests.displayName}), '[[:space:]]+', ' ', 'g')) = ${displayName}`,
+          contactCondition,
+          isNull(guests.archivedAt),
+          isNull(invitations.revokedAt),
+        ),
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  async insertAccessGrant(
+    values: typeof invitationAccessGrants.$inferInsert,
+    executor: DatabaseExecutor,
+  ) {
+    const rows = await executor.insert(invitationAccessGrants).values(values).returning();
+    return rows[0]!;
+  }
+
+  async accessGrantCandidates(prefix: string, now: Date, executor: DatabaseExecutor) {
+    return executor
+      .select({ grant: invitationAccessGrants, invitation: invitations })
+      .from(invitationAccessGrants)
+      .innerJoin(invitations, eq(invitations.id, invitationAccessGrants.invitationId))
+      .innerJoin(guests, eq(guests.id, invitations.guestId))
+      .where(
+        and(
+          eq(invitationAccessGrants.grantTokenPrefix, prefix),
+          isNull(invitationAccessGrants.revokedAt),
+          gt(invitationAccessGrants.expiresAt, now),
+          isNull(invitations.revokedAt),
+          isNull(guests.archivedAt),
+        ),
+      );
+  }
+
+  async markAccessGrantUsed(id: string, now: Date, executor: DatabaseExecutor) {
+    const rows = await executor
+      .update(invitationAccessGrants)
+      .set({ lastUsedAt: now })
+      .where(
+        and(
+          eq(invitationAccessGrants.id, id),
+          isNull(invitationAccessGrants.revokedAt),
+          gt(invitationAccessGrants.expiresAt, now),
+        ),
+      )
+      .returning({ id: invitationAccessGrants.id });
+    return rows.length === 1;
+  }
+
+  async cleanupAccessGrants(before: Date, executor: DatabaseExecutor) {
+    await executor
+      .delete(invitationAccessGrants)
+      .where(lt(invitationAccessGrants.expiresAt, before));
+  }
+
   async primaryHostname(eventId: string, executor: DatabaseExecutor) {
     const rows = await executor
       .select({ hostname: eventDomains.hostname })
@@ -86,21 +193,49 @@ export class InvitationsRepository {
   }
 
   async candidatesByPrefix(prefix: string, executor: DatabaseExecutor) {
-    return executor
-      .select()
+    const rows = await executor
+      .select({ invitation: invitations })
       .from(invitations)
-      .where(and(eq(invitations.publicTokenPrefix, prefix), isNull(invitations.revokedAt)));
+      .innerJoin(guests, eq(guests.id, invitations.guestId))
+      .where(
+        and(
+          eq(invitations.publicTokenPrefix, prefix),
+          isNull(invitations.revokedAt),
+          isNull(guests.archivedAt),
+        ),
+      );
+    return rows.map(({ invitation }) => invitation);
   }
 
   async publicDetails(invitationId: string, executor: DatabaseExecutor) {
     const rows = await executor
-      .select({ invitation: invitations, guest: guests, event: events })
+      .select({
+        invitation: invitations,
+        guest: guests,
+        event: events,
+      })
       .from(invitations)
       .innerJoin(guests, eq(guests.id, invitations.guestId))
       .innerJoin(events, eq(events.id, invitations.eventId))
-      .where(eq(invitations.id, invitationId))
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          isNull(invitations.revokedAt),
+          isNull(guests.archivedAt),
+        ),
+      )
       .limit(1);
-    return rows[0] ?? null;
+    const row = rows[0];
+    if (!row) return null;
+    const [localizations, primaryHostname, currentRsvp] = await Promise.all([
+      executor
+        .select()
+        .from(eventLocalizations)
+        .where(eq(eventLocalizations.eventId, row.event.id)),
+      this.primaryHostname(row.event.id, executor),
+      executor.select().from(rsvps).where(eq(rsvps.invitationId, invitationId)).limit(1),
+    ]);
+    return { ...row, localizations, primaryHostname, rsvp: currentRsvp[0] ?? null };
   }
 
   async recordOpen(id: string, now: Date, executor: DatabaseExecutor) {
@@ -113,7 +248,13 @@ export class InvitationsRepository {
         status: sql`case when ${invitations.status} in ('READY', 'SENT') then 'OPENED'::invitation_status else ${invitations.status} end`,
         updatedAt: now,
       })
-      .where(and(eq(invitations.id, id), isNull(invitations.revokedAt)))
+      .where(
+        and(
+          eq(invitations.id, id),
+          isNull(invitations.revokedAt),
+          sql`exists (select 1 from ${guests} where ${guests.id} = ${invitations.guestId} and ${guests.archivedAt} is null)`,
+        ),
+      )
       .returning();
     return rows[0] ?? null;
   }

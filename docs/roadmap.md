@@ -6,14 +6,18 @@
 - [x] Personalized public invitation pages.
 - [x] Temporary host panel.
 - [x] Initial open tracking.
-- [ ] **Current milestone: prepare RSVP responses, party sizes, and dietary notes.**
-- [ ] Visual invitation templates and envelope animation.
-- [ ] Transactional email provider and delivery tracking.
-- [ ] Calendar downloads and provider integrations.
-- [ ] Authenticated host dashboard and event editing.
+- [x] Temporary host event dashboard and bilingual event editing.
+- [x] Secure name-plus-contact lookup with short-lived hash-only access grants.
+- [x] Safe public landing and reusable visual invitation experience.
+- [x] Four localized presentation modes, media fallbacks, reduced motion, and protected host preview.
+- [x] RSVP responses, bounded attendance, dietary notes, guest messages, history, and host totals.
+- [x] Maps links, localized calendar providers/ICS, countdown, public social thumbnails, and sharing previews.
+- [x] Transactional invitation email provider, previews, attempts, and safe delivery tracking.
+- [ ] **Next milestone: birthday release, production deployment, and end-to-end QA.**
+- [ ] Replace temporary host access with authenticated users and event authorization.
 - [ ] Scheduled reminders and delivery preferences.
 - [ ] SMS provider behind a messaging adapter.
 - [ ] Users, authentication, and event authorization.
-- [ ] Versioned template catalog and customization.
+- [ ] Full versioned template catalog and customization builder.
 - [ ] Billing, plans, and payment provider.
 - [ ] Optional AI-assisted copy and design workflows.

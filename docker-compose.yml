@@ -20,6 +20,7 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       NODE_ENV: production
+      API_HOST: 0.0.0.0
       API_PORT: 3001
       DATABASE_URL: postgresql://matemyparty:matemyparty@postgres:5432/matemyparty
       APP_VERSION: ${APP_VERSION:-0.1.0}
@@ -49,8 +50,9 @@ services:
       dockerfile: docker/web.Dockerfile
     environment:
       NODE_ENV: production
+      WEB_HOST: 0.0.0.0
       WEB_PORT: 3000
-      NEXT_PUBLIC_API_BASE_URL: http://api:3001
+      INTERNAL_API_BASE_URL: http://api:3001
       PRIMARY_APP_HOSTNAME: ${PRIMARY_APP_HOSTNAME:-localhost:3000}
       HOST_ADMIN_TOKEN: ${HOST_ADMIN_TOKEN:?Set HOST_ADMIN_TOKEN in .env}
     ports:

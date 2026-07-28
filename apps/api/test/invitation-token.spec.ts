@@ -20,15 +20,38 @@ describe('InvitationTokenService', () => {
 describe('PublicInvitationUrlService', () => {
   it('prefers the event hostname for production HTTPS links', () => {
     const previous = {
+      environment: process.env.NODE_ENV,
       protocol: process.env.PUBLIC_APP_PROTOCOL,
       hostname: process.env.PRIMARY_APP_HOSTNAME,
     };
+    process.env.NODE_ENV = 'production';
     process.env.PUBLIC_APP_PROTOCOL = 'https';
     process.env.PRIMARY_APP_HOSTNAME = 'matemyparty.domoforge.com';
     expect(
       new PublicInvitationUrlService().build('A'.repeat(43), 'raymundo6th.domoforge.com'),
     ).toBe(`https://raymundo6th.domoforge.com/i/${'A'.repeat(43)}`);
-    process.env.PUBLIC_APP_PROTOCOL = previous.protocol;
-    process.env.PRIMARY_APP_HOSTNAME = previous.hostname;
+    restoreEnvironment('NODE_ENV', previous.environment);
+    restoreEnvironment('PUBLIC_APP_PROTOCOL', previous.protocol);
+    restoreEnvironment('PRIMARY_APP_HOSTNAME', previous.hostname);
+  });
+
+  it('never emits localhost or arbitrary hosts in production links', () => {
+    const previous = {
+      environment: process.env.NODE_ENV,
+      hostname: process.env.PRIMARY_APP_HOSTNAME,
+    };
+    process.env.NODE_ENV = 'production';
+    process.env.PRIMARY_APP_HOSTNAME = 'localhost:3200';
+    const service = new PublicInvitationUrlService();
+    expect(service.build('A'.repeat(43), 'attacker.example')).toBe(
+      `https://matemyparty.domoforge.com/i/${'A'.repeat(43)}`,
+    );
+    restoreEnvironment('NODE_ENV', previous.environment);
+    restoreEnvironment('PRIMARY_APP_HOSTNAME', previous.hostname);
   });
 });
+
+function restoreEnvironment(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+}

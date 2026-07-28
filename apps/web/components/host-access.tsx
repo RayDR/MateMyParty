@@ -3,12 +3,12 @@ import { Card } from '@matemyparty/ui';
 
 export function HostAccess({
   dictionary,
-  returnTo,
   invalid,
+  locale,
 }: {
   dictionary: Dictionary;
-  returnTo: string;
   invalid: boolean;
+  locale: 'en-US' | 'es-MX';
 }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 p-5 text-white">
@@ -22,7 +22,6 @@ export function HostAccess({
             </p>
           ) : null}
           <form action="/host/access" method="post" className="mt-6 space-y-4">
-            <input type="hidden" name="returnTo" value={returnTo} />
             <label className="block">
               <span className="text-sm text-slate-200">{dictionary.host.tokenLabel}</span>
               <input
@@ -37,6 +36,15 @@ export function HostAccess({
               {dictionary.host.signIn}
             </button>
           </form>
+          <nav className="mt-5 flex gap-3 text-sm" aria-label={dictionary.host.language}>
+            <a className="text-cyan-300 hover:text-cyan-200" href="/host/access?locale=en-US">
+              {dictionary.common.english}
+            </a>
+            <a className="text-cyan-300 hover:text-cyan-200" href="/host/access?locale=es-MX">
+              {dictionary.common.spanish}
+            </a>
+            <span className="sr-only">{locale}</span>
+          </nav>
           <p className="mt-6 text-xs text-amber-200">{dictionary.host.provisionalWarning}</p>
         </Card>
       </div>

@@ -1,193 +1,271 @@
-# VPS deployment
+# Domoforge VPS deployment
 
-This runbook deploys the complete MateMyParty modular monolith to one Ubuntu VPS with nginx, two systemd services, and PostgreSQL. It intentionally avoids Kubernetes, cloud-specific services, and additional runtime infrastructure.
+This runbook deploys MateMyParty directly from `/forge/matemyparty` on the existing Ubuntu VPS. It uses systemd, the existing Nginx installation, and the existing PostgreSQL 16 cluster. It does not require Docker, PM2, Kubernetes, or a cloud platform.
 
-## Topology
+## Current preflight state
 
-- nginx terminates TLS for `matemyparty.domoforge.com` and `raymundo6th.domoforge.com`.
-- Both hostnames proxy page requests to the same Next.js process on `127.0.0.1:3000`; the existing `Host` header keeps event-domain resolution data-driven.
-- `/api/*`, `/health`, and the reserved `/ws/*` path proxy to NestJS/Fastify on `127.0.0.1:3001`.
-- Browser host-panel requests use `/internal/host/*`, which remains on Next.js so the API bearer token never enters browser JavaScript.
-- PostgreSQL listens locally and is the only persistent service.
+The 2026-07-26 inspection found:
 
-nginx remains the recommended proxy. It is already mature for TLS, HTTP/2, compression, websocket upgrades, multiple hostnames, static assets, and upstream health isolation. Caddy would simplify certificate issuance, but that benefit does not justify replacing established VPS nginx operations at this stage.
+- Ubuntu 24.04.3 LTS, 8 vCPUs, 15 GiB RAM, and 326 GiB available disk.
+- Shell Node.js 22.17.0 and pnpm 11.17.0 are provided by the `sysops` NVM installation.
+- System Node.js 18.19.1 remains in use by unrelated services. MateMyParty uses an isolated Node.js 22.17.0 and pnpm 11.17.0 runtime under `/opt/matemyparty/runtime`.
+- PostgreSQL 16.14, Nginx 1.24.0, systemd 255, Certbot 2.9.0, and UFW are active.
+- Ports 3000 and 3001 are assigned to unrelated VPS applications. MateMyParty therefore uses `127.0.0.1:3200` for web and `127.0.0.1:3201` for API.
+- PostgreSQL currently listens on all interfaces. Its firewall exposure and remote consumers must be audited before changing `listen_addresses`.
+- Both public hostnames now resolve to this VPS at `66.179.210.180`, with no published AAAA records.
+- The current operator does not have passwordless sudo. Privileged provisioning commands below require an interactive sudo session.
 
-## 1. DNS and firewall
+The direct-repository approach matches the existing `/forge` convention and avoids premature release-directory machinery. Git pins a production deployment to `origin/main` or a release tag. A pre-release deployment may target `origin/develop` or an explicit commit already contained in `origin/develop`; `/var/lib/matemyparty/previous-commit` records the rollback target.
 
-Create `A` records for both hostnames pointing to the VPS. Add `AAAA` only when IPv6 is configured correctly. Confirm propagation before requesting certificates.
+## 1. DNS gate
 
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
-```
+Complete [dns.md](dns.md) first. Do not request a certificate while either hostname resolves away from `66.179.210.180`, and remove the current AAAA records because this VPS has no reachable global IPv6 address.
 
-Do not expose ports 3000, 3001, or 5432 publicly.
+## 2. System runtime and service account
 
-## 2. Ubuntu packages and Node.js
-
-```bash
-sudo apt update
-sudo apt install -y ca-certificates curl git nginx postgresql postgresql-contrib certbot openssl
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-sudo corepack enable
-node --version
-pnpm --version
-```
-
-The project pins pnpm in `package.json`. The systemd units resolve `pnpm` through their explicit restricted `PATH`; confirm that `command -v pnpm` returns `/usr/local/bin/pnpm` or `/usr/bin/pnpm` before enabling them.
-
-## 3. Service account and checkout
+Copy the reviewed Node.js 22 runtime into an application-owned system location. This avoids changing `/usr/bin/node`, which unrelated services still use, and avoids making systemd depend on a user's NVM directory:
 
 ```bash
-sudo adduser --system --group --home /opt/matemyparty matemyparty
-sudo -u matemyparty git clone https://github.com/RayDR/MateMyParty.git /opt/matemyparty
-cd /opt/matemyparty
-sudo -u matemyparty pnpm install --frozen-lockfile
+sudo install -d -m 0755 -o root -g root /opt/matemyparty
+sudo cp -a /home/sysops/.nvm/versions/node/v22.17.0 /opt/matemyparty/runtime
+sudo chown -R root:root /opt/matemyparty/runtime
+sudo chmod -R go-w /opt/matemyparty/runtime
+/opt/matemyparty/runtime/bin/node --version
+PATH=/opt/matemyparty/runtime/bin:/usr/bin:/bin \
+  /opt/matemyparty/runtime/bin/pnpm --version
 ```
 
-Deploy tags or reviewed `main` commits, not an arbitrary development branch.
+Create a locked service account and grant read access through the existing `release` group:
 
-## 4. PostgreSQL
+```bash
+sudo adduser --system --group --home /var/lib/matemyparty matemyparty
+sudo usermod --append --groups release matemyparty
+sudo install -d -m 0750 -o matemyparty -g matemyparty /var/lib/matemyparty
+sudo -u matemyparty test -r /forge/matemyparty/package.json
+```
 
-Create a distinct role and database. Substitute a generated password and store it only in the production environment file.
+Deployments remain owned and performed by `sysops`; the service account only runs the application.
+
+## 3. PostgreSQL and production environment
+
+Before changing PostgreSQL networking, identify every existing client. Prefer `listen_addresses = 'localhost'` after confirming no unrelated application requires a remote connection. Independently ensure UFW does not allow public TCP 5432.
+
+Generate a hexadecimal database password and host token in a private administrator session. Do not put either value in shell history, command arguments, chat, or logs. Create the role and UTF-8 database through a local `postgres` session:
 
 ```bash
 sudo -u postgres psql
 ```
 
 ```sql
-CREATE ROLE matemyparty LOGIN PASSWORD 'REPLACE_WITH_A_RANDOM_DATABASE_PASSWORD';
-CREATE DATABASE matemyparty OWNER matemyparty;
+CREATE ROLE matemyparty LOGIN PASSWORD 'PASTE_GENERATED_DATABASE_PASSWORD_HERE';
+CREATE DATABASE matemyparty
+  OWNER matemyparty
+  ENCODING 'UTF8'
+  TEMPLATE template0;
 \q
 ```
 
-Keep PostgreSQL bound to loopback. Establish automated encrypted backups before collecting real guest data.
-
-## 5. Production environment
+Create the environment outside Git:
 
 ```bash
-sudo install -d -m 0750 -o root -g matemyparty /etc/matemyparty
-sudo install -m 0640 -o root -g matemyparty .env.production.example /etc/matemyparty/matemyparty.env
-sudo editor /etc/matemyparty/matemyparty.env
+sudo install -d -m 0700 -o root -g root /etc/matemyparty
+sudo install -m 0600 -o root -g root \
+  /forge/matemyparty/.env.production.example \
+  /etc/matemyparty/matemyparty.env
+sudoedit /etc/matemyparty/matemyparty.env
+sudo chown root:root /etc/matemyparty/matemyparty.env
+sudo chmod 0600 /etc/matemyparty/matemyparty.env
 ```
 
-Generate the host token with `openssl rand -base64 48`. Replace both placeholders. Never place this file under `/opt/matemyparty`, expose the host token through `NEXT_PUBLIC_*`, or reuse development credentials.
+Replace every placeholder. Use a cryptographically random `HOST_ADMIN_TOKEN` of at least 32 characters. The production file must retain `WEB_HOST=127.0.0.1`, `WEB_PORT=3200`, `API_HOST=127.0.0.1`, `API_PORT=3201`, `INTERNAL_API_BASE_URL=http://127.0.0.1:3201`, `PRIMARY_APP_HOSTNAME=matemyparty.domoforge.com`, and `PUBLIC_APP_PROTOCOL=https`.
 
-Variable reference:
+Production also requires `EMAIL_PROVIDER=smtp`, a verified sender, and the SMTP values shown in `.env.production.example`. Keep the SMTP username and password only in the root-owned `0600` environment file. `SMTP_SECURE=false` is appropriate for STARTTLS on port 587; use `true` only when the provider documents implicit TLS (commonly port 465). Never place provider credentials in Git, shell history, command arguments, or support logs.
 
-- `NODE_ENV`: `production` activates production safety checks.
-- `WEB_PORT` and `API_PORT`: loopback upstream ports used by nginx.
-- `DATABASE_URL`: PostgreSQL connection used only by API/database commands.
-- `NEXT_PUBLIC_API_BASE_URL`: server-side API origin for Next.js; use loopback on the VPS.
-- `APP_VERSION`: health endpoint and release identifier.
-- `DEFAULT_LOCALE` and `SUPPORTED_LOCALES`: locale defaults and allow-list.
-- `PRIMARY_APP_HOSTNAME`: generic platform hostname and invitation fallback.
-- `HOST_ADMIN_TOKEN`: temporary host bearer secret; minimum 32 strong characters.
-- `PUBLIC_APP_PROTOCOL`: `https` for generated production invitation URLs.
-- `SEED_SAMPLE_GUESTS`: keep `false` in production.
+`INTERNAL_API_BASE_URL` is server-only and deliberately has no `NEXT_PUBLIC_` prefix. The browser uses relative `/internal/host/*` requests and never receives `HOST_ADMIN_TOKEN`. Keep `PUBLIC_APP_HOSTNAMES=matemyparty.domoforge.com,raymundo6th.domoforge.com` as the explicit public-origin allowlist. Production browser redirects fall back to the primary hostname when `Host` or forwarded headers contain localhost, a loopback address, or an unrecognized external hostname.
 
-## 6. Build, migrations, and seed
-
-Back up the database before every migration.
+The systemd manager reads `EnvironmentFile` before dropping privileges, so the application user does not need direct read access. Root ownership also prevents the service account from injecting commands into the root-run deployment script. Verify without printing the file:
 
 ```bash
-cd /opt/matemyparty
+sudo stat -c '%a %U:%G %n' /etc/matemyparty/matemyparty.env
+sudo test -r /etc/matemyparty/matemyparty.env
+sudo -u matemyparty test ! -r /etc/matemyparty/matemyparty.env
+sudo -u nobody test ! -r /etc/matemyparty/matemyparty.env
+```
+
+## 4. Install, validate, migrate, and seed
+
+Run from a clean, reviewed checkout:
+
+```bash
+cd /forge/matemyparty
+git status --short
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Load the protected environment only in a privileged shell and run migrations. Initial provisioning runs the idempotent seed twice with samples disabled:
+
+```bash
+sudo --preserve-env=PATH bash
 set -a
 . /etc/matemyparty/matemyparty.env
 set +a
-sudo -u matemyparty --preserve-env=NODE_ENV,DATABASE_URL,APP_VERSION,DEFAULT_LOCALE,SUPPORTED_LOCALES,PRIMARY_APP_HOSTNAME,HOST_ADMIN_TOKEN,PUBLIC_APP_PROTOCOL,SEED_SAMPLE_GUESTS pnpm build
-sudo -u matemyparty --preserve-env=DATABASE_URL pnpm db:migrate
-sudo -u matemyparty --preserve-env=DATABASE_URL,SEED_SAMPLE_GUESTS pnpm db:seed
+cd /forge/matemyparty
+sudo -u sysops --preserve-env=DATABASE_URL pnpm db:migrate
+sudo -u sysops --preserve-env=DATABASE_URL,SEED_SAMPLE_GUESTS pnpm db:seed
+sudo -u sysops --preserve-env=DATABASE_URL,SEED_SAMPLE_GUESTS pnpm db:seed
+exit
 ```
 
-The seed is idempotent. It preserves the original birthday event; production must keep `SEED_SAMPLE_GUESTS=false`.
+Verify that the seed retained `raymundo-6`, `raymundo6th.domoforge.com`, and `2026-08-06T18:00:00.000Z`. That instant is 1:00 p.m. in `America/Chicago` on August 6, 2026. Do not add an invented address or end time.
 
-## 7. systemd
+## 5. Install systemd services and backup timer
 
 ```bash
 sudo install -m 0644 deploy/systemd/matemyparty-api.service /etc/systemd/system/
 sudo install -m 0644 deploy/systemd/matemyparty-web.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/matemyparty-backup.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/matemyparty-backup.timer /etc/systemd/system/
+sudo install -d -m 0700 -o root -g root /var/backups/matemyparty
+sudo systemd-analyze verify \
+  /etc/systemd/system/matemyparty-api.service \
+  /etc/systemd/system/matemyparty-web.service \
+  /etc/systemd/system/matemyparty-backup.service \
+  /etc/systemd/system/matemyparty-backup.timer
 sudo systemctl daemon-reload
-sudo systemctl enable --now matemyparty-api matemyparty-web
-sudo systemctl status matemyparty-api matemyparty-web
+sudo systemctl enable --now matemyparty-api.service matemyparty-web.service
+sudo systemctl enable --now matemyparty-backup.timer
 ```
 
-Both services restart after failures with a five-second delay. Migrations are deliberately not an `ExecStartPre`; deployment runs them once under operator control. Logs go to the journal:
+Confirm loopback-only listeners and local behavior before touching Nginx:
 
 ```bash
-journalctl -u matemyparty-api -f
-journalctl -u matemyparty-web -f
+sudo ss -lntp '( sport = :3200 or sport = :3201 )'
+curl --fail http://127.0.0.1:3201/health
+curl --fail --header 'Host: matemyparty.domoforge.com' http://127.0.0.1:3200/
+curl --fail --header 'Host: raymundo6th.domoforge.com' http://127.0.0.1:3200/
+curl --fail http://127.0.0.1:3200/events/raymundo-6
 ```
 
-Test loopback before enabling nginx:
+## 6. Firewall review
+
+UFW is active, but its rule list requires sudo. Do not modify SSH or unrelated application rules without a separate impact review. First capture the effective policy:
 
 ```bash
-curl --fail http://127.0.0.1:3001/health
-curl --fail -H 'Host: raymundo6th.domoforge.com' http://127.0.0.1:3000/
+sudo ufw status verbose
+sudo ufw status numbered
+sudo iptables-save
+sudo ip6tables-save
 ```
 
-## 8. nginx and certificates
+The safe MateMyParty change plan is:
 
-Use the HTTP bootstrap config first:
+1. Confirm an existing SSH allow rule and the current remote session before any edit.
+2. Ensure TCP 80 and 443 are allowed for Nginx.
+3. Do not add public rules for 3200 or 3201.
+4. Remove any existing public allow for 5432 only after confirming no unrelated remote PostgreSQL client depends on it.
+5. Keep loopback traffic allowed and recheck the SSH session after each change.
+
+This VPS currently exposes unrelated services, including an application on public port 3000. MateMyParty does not own them, and this deployment must not stop or rewrite them. Achieving a VPS-wide policy of only SSH/HTTP/HTTPS requires a separate owner-approved audit.
+
+## 7. Nginx before TLS
+
+Back up any existing target, then install only the MateMyParty bootstrap site:
 
 ```bash
-sudo install -m 0644 deploy/nginx/matemyparty-bootstrap.conf /etc/nginx/sites-available/matemyparty
-sudo ln -sfn /etc/nginx/sites-available/matemyparty /etc/nginx/sites-enabled/matemyparty
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+if sudo test -e /etc/nginx/sites-available/matemyparty; then
+  sudo cp -a /etc/nginx/sites-available/matemyparty \
+    "/etc/nginx/sites-available/matemyparty.backup.${timestamp}"
+fi
+sudo install -m 0644 deploy/nginx/matemyparty-bootstrap.conf \
+  /etc/nginx/sites-available/matemyparty
+sudo ln -sfn /etc/nginx/sites-available/matemyparty \
+  /etc/nginx/sites-enabled/matemyparty
 sudo nginx -t
 sudo systemctl reload nginx
+```
+
+Use local resolution while public DNS remains blocked:
+
+```bash
+curl --fail --resolve matemyparty.domoforge.com:80:127.0.0.1 \
+  http://matemyparty.domoforge.com/
+curl --fail --resolve raymundo6th.domoforge.com:80:127.0.0.1 \
+  http://raymundo6th.domoforge.com/
+```
+
+Both Nginx files suppress access-log entries whose path begins with `/i/`; error logging remains enabled. The TLS configuration also sends `no-store` for invitation and host routes. `/health` and non-invitation `/api/*` routes go to Nest, while `/api/invitations/*` and `/api/calendar*` are deliberately unavailable through the public proxy so credential-bearing traffic can use only the loopback Next-to-API path. `/internal/*` stays on Next, and `/ws/*` is reserved without claiming a websocket implementation. Next applies `noindex`, `no-store`, and `no-referrer` headers to both `/i/*` and the verified `/invitation` session route.
+
+The final TLS site exposes only reviewed social images through a directory separate from protected media. Create it before configuring a local `publicThumbnailRef`; this command does not copy or publish any existing file:
+
+```bash
+sudo install -d -m 02750 -o sysops -g www-data /forge/matemyparty-public-thumbnails
+sudo install -d -m 02750 -o sysops -g www-data \
+  /forge/matemyparty-public-thumbnails/raymundo-6
+```
+
+Place only a reviewed image in the event subdirectory with owner `sysops`, group `www-data`, and mode `0640`, then configure `/event-thumbnails/raymundo-6/<filename>` in the host editor. Never link this alias to `/forge/matemyparty-private-media`; video and audio remain protected.
+
+## 8. TLS after DNS is correct
+
+Confirm both A records from at least two public resolvers before running Certbot:
+
+```bash
+dig +short A matemyparty.domoforge.com @1.1.1.1
+dig +short A raymundo6th.domoforge.com @8.8.8.8
+```
+
+Then use the VPS's existing Certbot workflow:
+
+```bash
 sudo certbot certonly --webroot -w /var/www/html \
   --cert-name matemyparty.domoforge.com \
   -d matemyparty.domoforge.com \
   -d raymundo6th.domoforge.com
-```
-
-Install the production configuration after certificate issuance:
-
-```bash
-sudo install -m 0644 deploy/nginx/matemyparty.conf /etc/nginx/sites-available/matemyparty
+sudo install -m 0644 deploy/nginx/matemyparty.conf \
+  /etc/nginx/sites-available/matemyparty
 sudo nginx -t
 sudo systemctl reload nginx
+sudo certbot certificates
 systemctl status certbot.timer
+sudo certbot renew --dry-run
 ```
 
-The production config supports HTTP/2, gzip, security headers, API routing, hostname preservation, and future websocket upgrades. HSTS is staged but commented out. Enable it only after both hostnames and certificate renewal have remained stable; HSTS can prevent an easy HTTP rollback, and `includeSubDomains` affects every Domoforge subdomain if applied at a parent domain.
+If Certbot requires an email and no existing account supplies one, stop and obtain the operator's real email. Keep HSTS disabled until both HTTPS hostnames and automatic renewal have remained stable.
 
-## 9. Deployment checklist
+## 9. Production checks and future deployments
 
-1. CI is green on the exact commit/tag.
-2. Database backup completed and restore method verified.
-3. `.env.production` placeholders replaced; permissions are `0640 root:matemyparty`.
-4. Dependencies installed with the frozen lockfile.
-5. `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` passed.
-6. Drizzle migrations applied once; seed executed with samples disabled.
-7. API and web services are active and journal logs contain no secrets or invitation URLs.
-8. `nginx -t` passed; certificate includes both hostnames.
-9. `/health`, platform page, birthday hostname, event path, one controlled invitation, and host panel verified.
-10. External ports 3000, 3001, and 5432 remain closed.
-
-Smoke tests:
+Run the checks in [operations.md](operations.md), [backup-and-restore.md](backup-and-restore.md), and the acceptance checklist below. Future production deployments must target code already merged into `main`:
 
 ```bash
-curl --fail https://matemyparty.domoforge.com/health
-curl --fail https://matemyparty.domoforge.com/
-curl --fail https://raymundo6th.domoforge.com/
-curl --fail https://matemyparty.domoforge.com/events/raymundo-6
+sudo /forge/matemyparty/deploy/scripts/deploy.sh --ref main
 ```
 
-Do not paste real invitation tokens into shell history or shared deployment logs.
+An explicitly authorized pre-release deployment can instead use the current `develop` tip without merging it to `main`:
 
-## 10. Rollback checklist
+```bash
+sudo /forge/matemyparty/deploy/scripts/deploy.sh --ref develop
+```
 
-1. Stop web traffic or enable a maintenance response if data compatibility is uncertain.
-2. Capture API/web journal output and the failing release identifier.
-3. Stop both services: `sudo systemctl stop matemyparty-web matemyparty-api`.
-4. Check out the prior known-good tag under `/opt/matemyparty` and run `pnpm install --frozen-lockfile && pnpm build`.
-5. Drizzle migrations are forward-only in this repository. Do not manually reverse SQL. Restore the pre-deployment PostgreSQL backup when the old application cannot read the new schema.
-6. Confirm the prior environment file remains compatible.
-7. Start API, verify `/health`, then start web and run hostname smoke tests.
-8. Reload nginx only when its configuration changed.
-9. Record the incident and follow with a `hotfix/*` branch from `main`.
+The script fetches safely, rejects a dirty tree or a commit outside the selected upstream, validates, builds, creates a pre-migration backup, migrates, restarts both services, and checks loopback health. It does not merge, push, run down migrations, or seed guests.
 
-For the current additive migrations, application rollback is normally safe, but database backup remains mandatory.
+## Acceptance checklist
+
+1. DNS resolves both names only to the intended VPS addresses.
+2. UFW permits SSH, HTTP, and HTTPS but not 3200, 3201, or 5432.
+3. PostgreSQL remote exposure has been eliminated without breaking unrelated clients.
+4. The environment is mode `0600`, owned by root, and unreadable by service or other users.
+5. Migrations and two seeds succeed; event data is unchanged.
+6. All repository validation passes and both units are active.
+7. Nginx syntax passes and only the MateMyParty site is changed.
+8. Both certificate names are present, renewal is enabled, and dry-run succeeds.
+9. Generic, event hostname, slug fallback, API, invitation, host session, and both locales work over HTTPS.
+10. No `/i/<token>` value appears in the MateMyParty access log.
+11. The backup timer is enabled and a non-empty custom-format backup has been created.
+
+Do not claim completion for a check that has not been executed on the live service.

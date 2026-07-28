@@ -2,17 +2,31 @@
   "$schema": "https://turbo.build/schema.json",
   "globalPassThroughEnv": [
     "NODE_ENV",
+    "WEB_HOST",
     "WEB_PORT",
+    "API_HOST",
     "API_PORT",
     "DATABASE_URL",
-    "NEXT_PUBLIC_API_BASE_URL",
+    "INTERNAL_API_BASE_URL",
     "APP_VERSION",
     "DEFAULT_LOCALE",
     "SUPPORTED_LOCALES",
     "PRIMARY_APP_HOSTNAME",
     "HOST_ADMIN_TOKEN",
     "PUBLIC_APP_PROTOCOL",
-    "SEED_SAMPLE_GUESTS"
+    "SEED_SAMPLE_GUESTS",
+    "EMAIL_PROVIDER",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_SECURE",
+    "SMTP_USERNAME",
+    "SMTP_PASSWORD",
+    "EMAIL_FROM_ADDRESS",
+    "EMAIL_FROM_NAME",
+    "EMAIL_REPLY_TO",
+    "EMAIL_SEND_CONCURRENCY",
+    "EMAIL_RATE_LIMIT_PER_MINUTE",
+    "EMAIL_SEND_TIMEOUT_MS"
   ],
   "tasks": {
     "build": {

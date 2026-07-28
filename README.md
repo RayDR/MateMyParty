@@ -1,6 +1,6 @@
 # MateMyParty
 
-MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone preserves Raymundo's sixth birthday as a generic event and adds guest management, secure individual invitation links, a temporary host panel, and initial open tracking.
+MateMyParty is a multilingual foundation for creating and operating digital invitations. The current milestone adds provider-neutral transactional invitation email, responsive localized previews, safe delivery attempts, idempotent retries, and SMTP production configuration while preserving RSVP, maps/calendar flows, and privacy-safe invitation lookup.
 
 ## Architecture
 
@@ -13,9 +13,14 @@ The pnpm/Turborepo workspace contains:
 - `packages/i18n`: separate `en-US` and `es-MX` JSON dictionaries.
 - `packages/ui`, `config`, and `typescript-config`: deliberately small shared foundations.
 
-See [docs/architecture.md](docs/architecture.md) for boundaries and decisions.
+See [docs/architecture.md](docs/architecture.md) for boundaries and decisions. Transactional invitation email architecture, protected endpoints, lifecycle, and privacy guarantees are documented in [docs/email-delivery.md](docs/email-delivery.md).
 
 The public platform hostname is `matemyparty.domoforge.com`; the first event remains available through `raymundo6th.domoforge.com` and the local `/events/raymundo-6` route.
+
+Production URLs, after DNS and TLS deployment, are:
+
+- `https://matemyparty.domoforge.com/` for the generic platform landing.
+- `https://raymundo6th.domoforge.com/` for Raymundo's birthday event.
 
 ## Requirements
 
@@ -32,7 +37,7 @@ pnpm install
 cp .env.example .env
 ```
 
-The example credentials are local-development values only. Every variable is documented in `.env.example`; change them for any shared environment. Generate a private host token before shared or production use, for example with `openssl rand -base64 32`. Next reads `NEXT_PUBLIC_API_BASE_URL` at build/runtime, while database access remains API-only. `HOST_ADMIN_TOKEN` must never use a `NEXT_PUBLIC_` prefix.
+The example credentials are local-development values only. Every variable is documented in `.env.example`; change them for any shared environment. Generate a private host token before shared or production use, for example with `openssl rand -hex 48`. Next reads `INTERNAL_API_BASE_URL` only on the server, while database access remains API-only. `HOST_ADMIN_TOKEN` must never use a `NEXT_PUBLIC_` prefix.
 
 ## Local development
 
@@ -47,11 +52,15 @@ pnpm dev
 
 Open `http://localhost:3000` for the product landing and `http://localhost:3000/events/raymundo-6` for the seeded event. The API is at `http://localhost:3001`; health is `GET /health`.
 
-The temporary host panel for the seeded event is:
+The public event route exposes promotional content only. Use the lookup form with a registered display name plus the complete email or phone; successful verification stores a 12-minute HttpOnly access grant and continues to `/invitation`. Existing permanent links remain available at `/i/{token}`. Both private experiences can create, update, and cancel RSVP responses, open encoded Google/Apple Maps links, use Google/Outlook calendar links, and download an Apple-compatible ICS file. Neither private route is cached or indexed. If no event end is stored, calendar-provider links use a 120-minute display fallback; ICS and database data do not invent an end time.
+
+The temporary host panel for the seeded event uses its public slug (the random public code also works):
 
 ```text
-http://localhost:3000/host/events/22222222-2222-4222-8222-222222222222/guests
+http://localhost:3000/host/events/raymundo-6/guests
 ```
+
+The protected presentation preview is at `http://localhost:3000/host/events/raymundo-6/preview`. It uses synthetic invitation data and supports public/private, language, viewport, media-disabled, and reduced-motion views without recording opens or permitting RSVP mutations.
 
 Enter `HOST_ADMIN_TOKEN` at the access screen. The server validates it and sets a derived HttpOnly, SameSite=Strict session cookie; browser JavaScript never receives the API secret. This mechanism is provisional and must be replaced by real user authentication and event authorization.
 
@@ -66,7 +75,7 @@ For a browser, add `127.0.0.1 raymundo6th.domoforge.com matemyparty.domoforge.co
 
 ## Database workflow
 
-`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for guests, invitations, activity, enums, checks, and the partial active-invitation index. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
+`pnpm db:generate` creates a reviewed, versioned SQL migration from schema changes. `pnpm db:migrate` applies pending migrations, including `0001_real_stingray.sql` for the original guest/invitation lifecycle, `0003_regular_the_order.sql` for explicit party counts, `0004_wooden_silver_sable.sql` for short-lived invitation access grants, `0005_freezing_romulus.sql` for current RSVP state plus immutable history, `0006_smiling_sage.sql` for the current-response update-time index, `0007_cool_gideon.sql` for maps/calendar and separated social thumbnails, and `0008_fancy_yellow_claw.sql` for token-free email delivery attempts and lifecycle constraints. `pnpm db:seed` is idempotent and creates the placeholder owner, generic event, hostname mapping, and revision 1. Timestamps are UTC; the event stores `America/Chicago` separately for presentation.
 
 Optional non-personal sample guests are inserted only when explicitly requested:
 
@@ -74,20 +83,20 @@ Optional non-personal sample guests are inserted only when explicitly requested:
 SEED_SAMPLE_GUESTS=true pnpm db:seed
 ```
 
-Address fields and `endsAt` are nullable because those facts are not yet known. No fabricated values are seeded.
+Address, coordinates, parking details, social thumbnail, and `endsAt` remain nullable because unknown facts are not invented. No fabricated values are seeded.
 
 ## Guest and invitation API flow
 
 Private host endpoints require the bearer token. Create a MANUAL guest:
 
 ```bash
-export EVENT_ID=22222222-2222-4222-8222-222222222222
+export EVENT_IDENTIFIER=raymundo-6
 export HOST_ADMIN_TOKEN='replace-with-the-value-from-your-env-file'
 
-curl -X POST "http://localhost:3001/api/host/events/$EVENT_ID/guests" \
+curl -X POST "http://localhost:3001/api/host/events/$EVENT_IDENTIFIER/guests" \
   -H "Authorization: Bearer $HOST_ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"displayName":"Family Sample","preferredChannel":"MANUAL","locale":"en-US","createInvitation":false}'
+  -d '{"displayName":"Family Sample","preferredChannel":"MANUAL","locale":"en-US","invitationCountMode":"TOTAL_ONLY","totalInvited":4,"createInvitation":false}'
 ```
 
 Copy the returned guest `id`, then create its invitation:
@@ -107,7 +116,7 @@ http://localhost:3000/i/{token}
 List guests, including archived records:
 
 ```bash
-curl "http://localhost:3001/api/host/events/$EVENT_ID/guests?includeArchived=true" \
+curl "http://localhost:3001/api/host/events/$EVENT_IDENTIFIER/guests?includeArchived=true" \
   -H "Authorization: Bearer $HOST_ADMIN_TOKEN"
 ```
 
@@ -130,7 +139,7 @@ pnpm docker:down
 
 ## Tests
 
-Contracts and frontend components use Vitest. The Nest API uses Jest. Run all suites with `pnpm test`; coverage includes guest semantics, token generation and hashing, host protection, invitation opening/regeneration/revocation, public DTO privacy, translation parity, personalized invitation rendering, and the host panel in addition to the original foundation.
+Contracts and frontend components use Vitest. The Nest API uses Jest. Run all suites with `pnpm test`; coverage includes public DTO privacy, RSVP states and attendance bounds, token/grant access, maps URL encoding and fallback, ICS escaping/CRLF/UID/privacy, calendar access, countdown states, safe metadata, SMS previews, locale priority, media fallbacks, presentation modes, and protected preview.
 
 See [docs/security.md](docs/security.md) before exposing any environment publicly.
 
@@ -138,7 +147,7 @@ See [docs/security.md](docs/security.md) before exposing any environment publicl
 
 Feature work branches from `develop` into `feature/*`, merges back through review, and reaches `main` only as a stable release. Hotfixes branch from `main`. See [docs/git-workflow.md](docs/git-workflow.md).
 
-The initial production target is one Ubuntu VPS with PostgreSQL, two systemd services, and nginx handling both public hostnames, TLS, API routing, and future websocket upgrades. See [docs/deployment.md](docs/deployment.md) and the examples under `deploy/`.
+The initial production target is one Ubuntu VPS with PostgreSQL, two systemd application services, a backup timer, and Nginx handling both public hostnames, TLS, API routing, and future websocket upgrades. See [deployment](docs/deployment.md), [operations](docs/operations.md), [DNS](docs/dns.md), and [backup and restore](docs/backup-and-restore.md), plus the examples under `deploy/`.
 
 ## License
 

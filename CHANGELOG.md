@@ -6,9 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Domoforge VPS deployment and operations runbooks.
+- Loopback-bound systemd units for the API and web application.
+- Daily PostgreSQL backup service and timer with seven-day local retention.
+- Fail-fast deployment automation with validation, pre-migration backup, and health checks.
+- DNS and backup-and-restore documentation.
+- RSVP current state and immutable response history.
+- Bounded total or adult/child attendance, dietary notes, and guest messages.
+- Public RSVP controls plus host statistics, filters, detail, and history views.
+
+### Changed
+
+- Moved the production web listener to `127.0.0.1:3200` to avoid an unrelated service on port 3000.
+- Replaced the public-prefixed API origin with the server-only `INTERNAL_API_BASE_URL`.
+- Hardened Nginx routing, no-store responses, and access-log privacy for invitation URLs.
+
 ### Planned
 
-- RSVP management.
+- Maps, calendar downloads/integrations, and event sharing.
 
 ## [0.1.0] - 2026-07-26
 

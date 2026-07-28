@@ -15,6 +15,55 @@
       "when": 1785044273961,
       "tag": "0001_real_stingray",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785105591572,
+      "tag": "0002_careful_lockheed",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785107382490,
+      "tag": "0003_regular_the_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785110228654,
+      "tag": "0004_wooden_silver_sable",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785114605457,
+      "tag": "0005_freezing_romulus",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785116203567,
+      "tag": "0006_smiling_sage",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785120118040,
+      "tag": "0007_cool_gideon",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785122767632,
+      "tag": "0008_fancy_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

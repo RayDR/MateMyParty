@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { getDictionary, type Locale } from '@matemyparty/i18n';
+import { getDictionary } from '@matemyparty/i18n';
 import { Card } from '@matemyparty/ui';
 import { LanguageSelector } from './language-selector';
+import { usePersistentLocale } from '../lib/use-persistent-locale';
 
 export function PlatformLanding() {
-  const [locale, setLocale] = useState<Locale>('en-US');
+  const [locale, setLocale] = usePersistentLocale('en-US');
   const dictionary = getDictionary(locale);
   return (
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#312e81,#020617_62%)] p-5">

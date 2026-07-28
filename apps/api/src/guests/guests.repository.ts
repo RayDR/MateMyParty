@@ -4,6 +4,7 @@ import {
   events,
   guests,
   invitations,
+  rsvps,
   type DatabaseConnection,
   type DatabaseExecutor,
 } from '@matemyparty/database';
@@ -74,6 +75,16 @@ export class GuestsRepository {
     return rows[0] ?? this.findById(guestId, true, executor);
   }
 
+  async restore(guestId: string, executor: DatabaseExecutor) {
+    const now = new Date();
+    const rows = await executor
+      .update(guests)
+      .set({ archivedAt: null, updatedAt: now })
+      .where(and(eq(guests.id, guestId), isNotNull(guests.archivedAt)))
+      .returning();
+    return rows[0] ?? this.findById(guestId, true, executor);
+  }
+
   async list(eventId: string, includeArchived: boolean) {
     const conditions = [eq(guests.eventId, eventId)];
     conditions.push(includeArchived ? isNotNull(guests.id) : isNull(guests.archivedAt));
@@ -83,18 +94,20 @@ export class GuestsRepository {
       .where(and(...conditions))
       .orderBy(guests.displayName);
     return Promise.all(
-      guestRows.map(async (guest) => ({
-        guest,
-        invitation:
-          (
-            await this.connection.db
-              .select()
-              .from(invitations)
-              .where(eq(invitations.guestId, guest.id))
-              .orderBy(desc(invitations.createdAt))
-              .limit(1)
-          )[0] ?? null,
-      })),
+      guestRows.map(async (guest) => {
+        const latest = await this.connection.db
+          .select({ invitation: invitations, rsvp: rsvps })
+          .from(invitations)
+          .leftJoin(rsvps, eq(rsvps.invitationId, invitations.id))
+          .where(eq(invitations.guestId, guest.id))
+          .orderBy(desc(invitations.createdAt))
+          .limit(1);
+        return {
+          guest,
+          invitation: latest[0]?.invitation ?? null,
+          rsvp: latest[0]?.rsvp ?? null,
+        };
+      }),
     );
   }
 }

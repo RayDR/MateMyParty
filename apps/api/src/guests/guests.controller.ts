@@ -21,15 +21,20 @@ export class GuestsController {
 
   @Get('events/:eventId/guests')
   list(
-    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('eventId') eventIdentifier: string,
     @Query('includeArchived', new DefaultValuePipe(false), ParseBoolPipe) includeArchived: boolean,
   ) {
-    return this.guests.list(eventId, includeArchived);
+    return this.guests.list(eventIdentifier, includeArchived);
+  }
+
+  @Get('events/:eventId/guest-statistics')
+  statistics(@Param('eventId') eventIdentifier: string) {
+    return this.guests.statistics(eventIdentifier);
   }
 
   @Post('events/:eventId/guests')
-  create(@Param('eventId', new ParseUUIDPipe()) eventId: string, @Body() body: unknown) {
-    return this.guests.create(eventId, body);
+  create(@Param('eventId') eventIdentifier: string, @Body() body: unknown) {
+    return this.guests.create(eventIdentifier, body);
   }
 
   @Patch('guests/:guestId')
@@ -40,5 +45,10 @@ export class GuestsController {
   @Post('guests/:guestId/archive')
   archive(@Param('guestId', new ParseUUIDPipe()) guestId: string) {
     return this.guests.archive(guestId);
+  }
+
+  @Post('guests/:guestId/restore')
+  restore(@Param('guestId', new ParseUUIDPipe()) guestId: string) {
+    return this.guests.restore(guestId);
   }
 }

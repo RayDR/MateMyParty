@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-*
 dist
 coverage
 .turbo
@@ -9,3 +10,5 @@ coverage
 !.env.production.example
 *.tsbuildinfo
 .DS_Store
+
+deploy/logs/

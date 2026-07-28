@@ -7,3 +7,469 @@ body {
   margin: 0;
   min-height: 100vh;
 }
+
+.invitation-front,
+.invitation-back {
+  transform-origin: center;
+  animation: invitation-reveal 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-closed-card {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    0 2.5rem 7rem rgb(2 6 23 / 55%),
+    inset 0 0 0 1px rgb(255 255 255 / 5%);
+}
+
+.invitation-closed-card::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(255 255 255 / 9%), transparent 34%);
+}
+
+.invitation-envelope-button {
+  animation: invitation-envelope-pulse 2.8s ease-in-out infinite;
+}
+
+.invitation-envelope-button:hover {
+  background-color: rgb(251 191 36 / 18%);
+}
+
+.invitation-envelope-closed,
+.invitation-envelope-open {
+  transform-origin: center top;
+}
+
+.invitation-envelope-closed {
+  animation: invitation-envelope-close-cycle 2.8s ease-in-out infinite;
+}
+
+.invitation-envelope-open {
+  animation: invitation-envelope-open-cycle 2.8s ease-in-out infinite;
+}
+
+.invitation-envelope-opened {
+  animation: invitation-envelope-settle 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-summary {
+  animation: invitation-summary-reveal 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-summary-copy {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.invitation-back {
+  animation-name: invitation-card-rise;
+}
+
+.invitation-opening-envelope_reveal::before {
+  position: absolute;
+  z-index: 30;
+  inset: 0 0 46%;
+  pointer-events: none;
+  content: '';
+  transform-origin: top;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: linear-gradient(160deg, #312e81, #701a75);
+  animation: invitation-flap-lift 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.invitation-opening-night_dragon_flight {
+  animation-name: invitation-night-cinematic;
+  animation-duration: 850ms;
+}
+
+.invitation-opening-adventure_gates {
+  animation-name: invitation-gates;
+}
+
+.invitation-opening-winter_snow {
+  animation-name: invitation-card-flip;
+}
+
+.invitation-countdown-watermark {
+  position: absolute;
+  z-index: 0;
+  top: 0.25rem;
+  right: 0.65rem;
+  left: 0.65rem;
+  pointer-events: none;
+  overflow: hidden;
+  color: rgb(165 243 252 / 9%);
+  font-size: clamp(2rem, 8vw, 5.5rem);
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -0.06em;
+  user-select: none;
+}
+
+.invitation-essential {
+  margin-top: clamp(3rem, 9vw, 5.5rem);
+}
+
+.invitation-rsvp-footer,
+.invitation-rsvp-panel {
+  overscroll-behavior: contain;
+}
+
+[data-reduced-motion='true'] .invitation-front,
+[data-reduced-motion='true'] .invitation-back {
+  animation: none;
+}
+
+[data-reduced-motion='true'] .invitation-opening-envelope_reveal::before {
+  display: none;
+}
+
+[data-reduced-motion='true'] .invitation-envelope-button,
+[data-reduced-motion='true'] .invitation-envelope-closed,
+[data-reduced-motion='true'] .invitation-envelope-open,
+[data-reduced-motion='true'] .invitation-envelope-opened,
+[data-reduced-motion='true'] .invitation-summary {
+  animation: none;
+}
+
+[data-reduced-motion='true'] .invitation-envelope-closed {
+  opacity: 1;
+}
+
+[data-reduced-motion='true'] .invitation-envelope-open {
+  opacity: 0;
+}
+
+.invitation-section[open] .invitation-chevron {
+  transform: rotate(180deg);
+}
+
+.invitation-chevron {
+  transition: transform 180ms ease;
+}
+
+.rich-text p,
+.rich-text ul,
+.rich-text ol {
+  margin-block: 0.65rem;
+  line-height: 1.7;
+}
+
+.rich-text ul,
+.rich-text ol {
+  padding-left: 1.35rem;
+}
+
+.rich-text ul {
+  list-style: disc;
+}
+
+.rich-text ol {
+  list-style: decimal;
+}
+
+.rich-text h2,
+.rich-text h3 {
+  margin-top: 1rem;
+  font-weight: 800;
+  color: #cffafe;
+}
+
+.rich-text a {
+  color: #67e8f9;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+@keyframes invitation-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invitation-envelope-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0.75rem 2rem rgb(2 6 23 / 45%);
+  }
+  50% {
+    box-shadow:
+      0 0.75rem 2rem rgb(2 6 23 / 45%),
+      0 0 0 0.35rem rgb(253 230 138 / 10%);
+  }
+}
+
+@keyframes invitation-envelope-close-cycle {
+  0%,
+  30%,
+  100% {
+    opacity: 1;
+    transform: perspective(12rem) rotateX(0) scale(1);
+  }
+  43%,
+  76% {
+    opacity: 0;
+    transform: perspective(12rem) rotateX(34deg) scale(0.94);
+  }
+}
+
+@keyframes invitation-envelope-open-cycle {
+  0%,
+  30%,
+  100% {
+    opacity: 0;
+    transform: translateY(0.15rem) scale(0.94);
+  }
+  43%,
+  76% {
+    opacity: 1;
+    transform: translateY(-0.05rem) scale(1);
+  }
+}
+
+@keyframes invitation-envelope-settle {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invitation-summary-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invitation-card-rise {
+  from {
+    opacity: 0;
+    transform: perspective(70rem) translateY(2.5rem) rotateX(5deg) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(70rem) translateY(0) rotateX(0) scale(1);
+  }
+}
+
+@keyframes invitation-flap-lift {
+  0% {
+    opacity: 1;
+    transform: perspective(50rem) rotateX(0);
+  }
+  72% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(50rem) rotateX(108deg) translateY(-1.5rem);
+    visibility: hidden;
+  }
+}
+
+@keyframes invitation-night-cinematic {
+  from {
+    opacity: 0;
+    filter: brightness(0.15) saturate(0.7);
+    transform: scale(1.035) translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes invitation-gates {
+  from {
+    opacity: 0;
+    transform: scaleX(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes invitation-card-flip {
+  from {
+    opacity: 0;
+    transform: perspective(60rem) rotateY(-18deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(60rem) rotateY(0);
+  }
+}
+
+.celebration-flight::before,
+.celebration-flight::after {
+  position: absolute;
+  content: '';
+  width: 16rem;
+  height: 5rem;
+  border-radius: 100%;
+  background: radial-gradient(ellipse, rgb(103 232 249 / 35%), transparent 68%);
+  filter: blur(2px);
+  animation: night-flight 11s ease-in-out infinite;
+}
+
+.celebration-flight::after {
+  animation-delay: -5s;
+  animation-duration: 14s;
+  opacity: 0.55;
+}
+
+.celebration-gates::before,
+.celebration-gates::after {
+  position: absolute;
+  inset-block: 0;
+  width: 28%;
+  content: '';
+  border: 1px solid rgb(253 230 138 / 25%);
+  background: linear-gradient(90deg, rgb(15 23 42 / 85%), rgb(88 28 135 / 35%));
+  box-shadow: 0 0 5rem rgb(217 70 239 / 22%);
+  animation: gate-reveal 2.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.celebration-gates::before {
+  left: 0;
+  transform-origin: left;
+}
+
+.celebration-gates::after {
+  right: 0;
+  transform-origin: right;
+}
+
+.celebration-envelope::before {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: min(70vw, 34rem);
+  aspect-ratio: 16 / 10;
+  content: '';
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 1.5rem;
+  background: linear-gradient(145deg, rgb(244 114 182 / 18%), rgb(99 102 241 / 18%));
+  box-shadow: 0 2rem 6rem rgb(76 29 149 / 35%);
+  animation: envelope-reveal 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.celebration-snow {
+  background-image:
+    radial-gradient(circle, rgb(255 255 255 / 70%) 0 2px, transparent 3px),
+    radial-gradient(circle, rgb(186 230 253 / 55%) 0 1px, transparent 2px);
+  background-position:
+    0 0,
+    3rem 5rem;
+  background-size:
+    7rem 7rem,
+    5rem 5rem;
+  animation: winter-snow 13s linear infinite;
+}
+
+@keyframes night-flight {
+  0% {
+    transform: translate(-25vw, 70vh) rotate(-8deg) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  75% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(115vw, 12vh) rotate(6deg) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes gate-reveal {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.12);
+  }
+}
+
+@keyframes envelope-reveal {
+  from {
+    transform: translate(-50%, 38vh) rotateX(68deg) scale(0.72);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0) rotateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes winter-snow {
+  from {
+    background-position:
+      0 -7rem,
+      3rem -5rem;
+  }
+  to {
+    background-position:
+      2rem 7rem,
+      0 5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-flight,
+  .celebration-gates,
+  .celebration-envelope,
+  .celebration-snow,
+  .invitation-motion-video {
+    display: none;
+  }
+
+  .invitation-front,
+  .invitation-back,
+  .invitation-opening-envelope_reveal::before,
+  .invitation-envelope-button,
+  .invitation-envelope-closed,
+  .invitation-envelope-open,
+  .invitation-envelope-opened,
+  .invitation-summary {
+    animation: none;
+  }
+
+  .invitation-opening-envelope_reveal::before {
+    display: none;
+  }
+
+  .invitation-envelope-closed {
+    opacity: 1;
+  }
+
+  .invitation-envelope-open {
+    opacity: 0;
+  }
+}
