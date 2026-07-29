@@ -63,7 +63,7 @@ describe('/i/[token] content', () => {
     expect(screen.getByText("You're invited")).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Family Sample' })).toBeVisible();
     expect(screen.getByText('We cannot wait to celebrate with you.')).toBeInTheDocument();
-    expect(screen.getByText('Please arrive ten minutes early.')).toBeInTheDocument();
+    expect(screen.queryByText('Please arrive ten minutes early.')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Raymundo’s 6th Birthday' }),
     ).not.toBeInTheDocument();
@@ -88,15 +88,28 @@ describe('/i/[token] content', () => {
     expect(screen.getByText('Family Sample')).toBeVisible();
     expect(screen.getByText('2 adults · 2 children')).toBeVisible();
     expect(screen.getByText(/1:00 PM/)).toBeVisible();
-    expect(screen.getByText(/123 Celebration Lane/)).toBeVisible();
+    expect(screen.getByTitle('Address')).toHaveAttribute(
+      'src',
+      expect.stringContaining('123%20Celebration%20Lane'),
+    );
     expect(screen.getByRole('timer')).toHaveAttribute('data-countdown-presentation', 'watermark');
     expect(screen.getByRole('link', { name: 'Directions' })).toHaveAttribute(
       'href',
       'https://maps.example.test/celebration',
     );
-    expect(screen.getByRole('link', { name: 'Google Maps' })).toHaveAttribute(
-      'href',
+    expect(screen.getByTitle('Address')).toHaveAttribute(
+      'src',
       expect.stringContaining('google.com/maps'),
+    );
+
+    expect(screen.getByRole('link', { name: 'Directions' })).toHaveAttribute(
+      'href',
+      'https://maps.example.test/celebration',
+    );
+
+    expect(screen.getByRole('link', { name: 'Apple Maps' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('maps.apple.com'),
     );
     expect(screen.getByRole('link', { name: 'Apple Maps' })).toHaveAttribute(
       'href',
@@ -104,9 +117,7 @@ describe('/i/[token] content', () => {
     );
     expect(screen.getByText('Arrival information').closest('details')).not.toHaveAttribute('open');
     expect(screen.getByText('Parking information').closest('details')).not.toHaveAttribute('open');
-    expect(screen.getByText('Message from the host').closest('details')).not.toHaveAttribute(
-      'open',
-    );
+    expect(screen.getByText('Message from the host').closest('details')).toHaveAttribute('open');
     expect(container.querySelector('.invitation-essential')?.closest('details')).toBeNull();
     expect(screen.getByRole('contentinfo', { name: 'RSVP' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Pause video + Pause theme audio' })).toHaveAttribute(
