@@ -1,17 +1,59 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { validHostSession } from './host-session';
+import { hostSessionScope, type HostAccessScope } from './host-session';
 import { publicRequestOrigin } from './public-origin';
 import { internalApiBaseUrl } from './server-api';
+
+function eventIdentifierFromPath(path: string): string | null {
+  const prefix = '/api/host/events/';
+  if (!path.startsWith(prefix)) return null;
+  const segment = path.slice(prefix.length).split('/')[0];
+  if (!segment) return null;
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
+function scopeAllowsPath(scope: HostAccessScope, path: string): boolean {
+  if (scope.kind === 'admin') return true;
+  if (path === '/api/host/events') return true;
+  return eventIdentifierFromPath(path) === scope.eventIdentifier;
+}
+
+function filterScopedEvents(responseBody: string, eventIdentifier: string): string {
+  try {
+    const events = JSON.parse(responseBody) as Array<{
+      identifier?: unknown;
+      publicSlug?: unknown;
+    }>;
+    if (!Array.isArray(events)) return '[]';
+    return JSON.stringify(
+      events.filter(
+        (event) => event.identifier === eventIdentifier || event.publicSlug === eventIdentifier,
+      ),
+    );
+  } catch {
+    return '[]';
+  }
+}
 
 export async function forwardHostRequest(
   request: NextRequest,
   path: string,
   method = request.method,
 ) {
-  if (!validHostSession(request)) {
+  const scope = hostSessionScope(request);
+  if (!scope) {
     return NextResponse.json(
       { code: 'UNAUTHORIZED', message: 'Host access denied', status: 401 },
       { status: 401 },
+    );
+  }
+  if (!scopeAllowsPath(scope, path)) {
+    return NextResponse.json(
+      { code: 'FORBIDDEN', message: 'Event access denied', status: 403 },
+      { status: 403 },
     );
   }
   const token = process.env.HOST_ADMIN_TOKEN;
@@ -31,7 +73,10 @@ export async function forwardHostRequest(
       ...(request.headers.get('x-mmp-csrf') === '1' ? { 'x-mmp-csrf': '1' } : {}),
     },
   });
-  const responseBody = await upstream.text();
+  let responseBody = await upstream.text();
+  if (upstream.ok && scope.kind === 'event' && path === '/api/host/events' && method === 'GET') {
+    responseBody = filterScopedEvents(responseBody, scope.eventIdentifier);
+  }
   return new NextResponse(responseBody, {
     status: upstream.status,
     headers: {
