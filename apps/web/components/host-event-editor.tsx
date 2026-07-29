@@ -276,7 +276,7 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
             <RichTextEditor
               label={dictionary.host.hostMessageLabel}
               value={content.hostMessage ?? ''}
-              onChange={(value) => changeLocalized('hostMessage', emptyToNull(value))}
+              onChange={(value) => changeLocalized('hostMessage', value === '' ? null : value)}
               dictionary={dictionary}
               className="md:col-span-2"
             />
@@ -415,14 +415,18 @@ export function HostEventEditor({ identifier }: { identifier: string }) {
             <RichTextEditor
               label={dictionary.host.arrivalInstructions}
               value={content.arrivalInstructions ?? ''}
-              onChange={(value) => changeLocalized('arrivalInstructions', emptyToNull(value))}
+              onChange={(value) =>
+                changeLocalized('arrivalInstructions', value === '' ? null : value)
+              }
               dictionary={dictionary}
               className="md:col-span-2"
             />
             <RichTextEditor
               label={dictionary.host.parkingInstructions}
               value={content.parkingInstructions ?? ''}
-              onChange={(value) => changeLocalized('parkingInstructions', emptyToNull(value))}
+              onChange={(value) =>
+                changeLocalized('parkingInstructions', value === '' ? null : value)
+              }
               dictionary={dictionary}
               className="md:col-span-2"
             />
