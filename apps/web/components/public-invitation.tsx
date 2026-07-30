@@ -54,6 +54,7 @@ export function PublicInvitation({
   const [calendar, setCalendar] = useState<CalendarEvent>(invitation.tools.calendar);
   const media = useRef<InvitationMediaHandle>(null);
   const summary = useRef<HTMLElement>(null);
+  const openingTracked = useRef(false);
   const dictionary = getDictionary(locale);
   const { event } = invitation;
   const content = event.localizedContent[locale];
@@ -126,6 +127,32 @@ export function PublicInvitation({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [phase, reducedMotion]);
+
+  function revealInvitation() {
+    if (!preview && !openingTracked.current) {
+      openingTracked.current = true;
+
+      void fetch('/internal/invitation/open', {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: {
+          'x-mmp-csrf': '1',
+          ...(accessToken ? { 'x-invitation-token': accessToken } : {}),
+        },
+      }).catch(() => {
+        /*
+         * Tracking must never prevent the guest from opening the
+         * invitation or unlocking its media.
+         */
+      });
+    }
+
+    void media.current?.unlockAudio();
+    setPhase('summary');
+  }
+
   return (
     <ThemedInvitationStage
       ref={media}
@@ -187,10 +214,7 @@ export function PublicInvitation({
                       type="button"
                       title={dictionary.invitation.openInvitation}
                       aria-label={dictionary.invitation.openInvitation}
-                      onClick={() => {
-                        void media.current?.unlockAudio();
-                        setPhase('summary');
-                      }}
+                      onClick={revealInvitation}
                       className="invitation-envelope-button relative flex size-16 items-center justify-center rounded-full border border-amber-200/60 bg-slate-950/45 text-amber-200 shadow-xl backdrop-blur-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
                     >
                       <Mail aria-hidden size={28} className="invitation-envelope-closed absolute" />
