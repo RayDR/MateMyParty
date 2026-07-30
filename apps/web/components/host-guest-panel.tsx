@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
-  EmailPreview,
   EventEmailStatistics,
   GuestInvitationStatistics,
   HostEventDetail,
@@ -17,6 +16,7 @@ import type {
 } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
 import { usePersistentLocale } from '../lib/use-persistent-locale';
+import { HostInvitationPreviewModal, type HostPreviewTab } from './host-invitation-preview-modal';
 import { Plus, X } from 'lucide-react';
 
 type Filter =
@@ -78,12 +78,11 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
   const [statistics, setStatistics] = useState(emptyStatistics);
   const [rsvpStatistics, setRsvpStatistics] = useState(emptyRsvpStatistics);
   const [emailStatistics, setEmailStatistics] = useState(emptyEmailStatistics);
-  const [emailPreview, setEmailPreview] = useState<EmailPreview | null>(null);
-  const [emailPreviewGuest, setEmailPreviewGuest] = useState<HostGuest | null>(null);
   const [emailBusy, setEmailBusy] = useState<string | null>(null);
   const [rsvpDetail, setRsvpDetail] = useState<HostInvitationRsvpDetail | null>(null);
   const [sharePreview, setSharePreview] = useState<InvitationSharePreview | null>(null);
   const [previewGuest, setPreviewGuest] = useState<HostGuest | null>(null);
+  const [previewTab, setPreviewTab] = useState<HostPreviewTab>('message');
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<HostGuest | null>(null);
@@ -261,19 +260,13 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     return response.json() as Promise<unknown>;
   }
 
-  async function showEmailPreview(guest: HostGuest) {
-    setEmailPreviewGuest(guest);
-    setEmailPreview(null);
-    const response = await fetch(
-      `/internal/host/guests/${guest.id}/email/preview?locale=${encodeURIComponent(guest.locale)}`,
-      { cache: 'no-store' },
-    );
-    if (!response.ok) {
-      setEmailPreviewGuest(null);
-      setError(true);
-      return;
+  function openPreview(guest: HostGuest, tab: HostPreviewTab, copyLinkAutomatically = false) {
+    setPreviewTab(tab);
+    setPreviewGuest(guest);
+
+    if (copyLinkAutomatically && links[guest.id]) {
+      void copy(guest.id);
     }
-    setEmailPreview((await response.json()) as EmailPreview);
   }
 
   async function sendEmail(guest: HostGuest) {
@@ -312,6 +305,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     )) as InvitationResult | null;
     if (result?.publicUrl) {
       setLinks((current) => ({ ...current, [guest.id]: result.publicUrl! }));
+      setPreviewTab('message');
       setPreviewGuest({ ...guest, invitation: result.invitation });
     }
     await load();
@@ -325,6 +319,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     )) as InvitationResult | null;
     if (result?.publicUrl) {
       setLinks((current) => ({ ...current, [guest.id]: result.publicUrl! }));
+      setPreviewTab('message');
       setPreviewGuest({ ...guest, invitation: result.invitation });
     }
     await load();
@@ -354,9 +349,15 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
   async function copy(guestId: string) {
     const link = links[guestId];
     if (!link) return;
-    await navigator.clipboard.writeText(link);
-    setCopied(guestId);
-    window.setTimeout(() => setCopied(null), 1800);
+
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(guestId);
+      setError(false);
+      window.setTimeout(() => setCopied(null), 1800);
+    } catch {
+      setError(true);
+    }
   }
 
   async function showRsvp(guest: HostGuest) {
@@ -540,7 +541,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                   onEdit={() => beginEdit(guest)}
                   onGenerate={() => void generate(guest)}
                   onCopy={() => void copy(guest.id)}
-                  onPreview={() => setPreviewGuest(guest)}
+                  onPreview={() => openPreview(guest, 'message', true)}
                   onRsvp={() => void showRsvp(guest)}
                   onRegenerate={() => void regenerate(guest)}
                   onRevoke={() => void revoke(guest)}
@@ -556,7 +557,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                       dictionary.host.confirmRestore,
                     )
                   }
-                  onEmailPreview={() => void showEmailPreview(guest)}
+                  onEmailPreview={() => openPreview(guest, 'email')}
                   onEmailSend={() => void sendEmail(guest)}
                   emailBusy={emailBusy === guest.id}
                 />
@@ -571,7 +572,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
               onEdit={beginEdit}
               onGenerate={(guest) => void generate(guest)}
               onCopy={(guest) => void copy(guest.id)}
-              onPreview={setPreviewGuest}
+              onPreview={(guest) => openPreview(guest, 'message', true)}
               onRsvp={(guest) => void showRsvp(guest)}
               onRegenerate={(guest) => void regenerate(guest)}
               onRevoke={(guest) => void revoke(guest)}
@@ -587,7 +588,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                   dictionary.host.confirmRestore,
                 )
               }
-              onEmailPreview={(guest) => void showEmailPreview(guest)}
+              onEmailPreview={(guest) => openPreview(guest, 'email')}
               onEmailSend={(guest) => void sendEmail(guest)}
               emailBusy={emailBusy}
             />
@@ -595,12 +596,14 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
         )}
       </div>
       {previewGuest ? (
-        <SharingPreview
+        <HostInvitationPreviewModal
+          eventIdentifier={eventIdentifier}
           guest={previewGuest}
-          preview={sharePreview}
+          sharePreview={sharePreview}
           publicUrl={links[previewGuest.id]}
           dictionary={dictionary}
-          copied={copied === previewGuest.id}
+          initialTab={previewTab}
+          linkCopied={copied === previewGuest.id}
           onCopy={() => void copy(previewGuest.id)}
           onClose={() => setPreviewGuest(null)}
         />
@@ -646,17 +649,6 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           dictionary={dictionary}
           locale={locale}
           onClose={() => setRsvpDetail(null)}
-        />
-      ) : null}
-      {emailPreviewGuest ? (
-        <EmailPreviewModal
-          guest={emailPreviewGuest}
-          preview={emailPreview}
-          dictionary={dictionary}
-          onClose={() => {
-            setEmailPreviewGuest(null);
-            setEmailPreview(null);
-          }}
         />
       ) : null}
     </main>
@@ -1329,257 +1321,6 @@ function StatusBadge({ guest, dictionary }: { guest: HostGuest; dictionary: Dict
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${style}`}>{label}</span>
   );
-}
-
-function SharingPreview({
-  guest,
-  preview,
-  publicUrl,
-  dictionary,
-  copied,
-  onCopy,
-  onClose,
-}: {
-  guest: HostGuest;
-  preview: InvitationSharePreview | null;
-  publicUrl?: string;
-  dictionary: Dictionary;
-  copied: boolean;
-  onCopy: () => void;
-  onClose: () => void;
-}) {
-  const [copiedTemplate, setCopiedTemplate] = useState<string | null>(null);
-  const smsText = preview
-    ? publicUrl
-      ? preview.smsText.replace(/https?:\/\/[^\s]+\/i\/…|\/i\/…/, publicUrl)
-      : preview.smsText
-    : '';
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={dictionary.host.invitationPreview}
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 p-4 backdrop-blur-sm"
-    >
-      <div className="mx-auto my-6 max-w-3xl rounded-3xl border border-white/15 bg-slate-900 p-5 shadow-2xl sm:p-7">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
-              {dictionary.host.invitationPreview}
-            </p>
-            <h2 className="mt-1 text-2xl font-black">{guest.displayName}</h2>
-          </div>
-          <button onClick={onClose} className="rounded-xl bg-slate-700 px-4 py-2">
-            {dictionary.host.closePreview}
-          </button>
-        </div>
-        {!preview ? (
-          <p className="mt-6 text-slate-300">{dictionary.host.loadingPreview}</p>
-        ) : (
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
-            <section className="overflow-hidden rounded-3xl bg-[#0b141a] shadow-xl">
-              <p className="p-3 text-xs font-bold text-emerald-300">
-                {dictionary.host.whatsAppPreview}
-              </p>
-              {preview.publicThumbnailRef ? (
-                <img
-                  src={preview.publicThumbnailRef}
-                  alt={preview.thumbnailAltText}
-                  className="h-40 w-full object-cover"
-                />
-              ) : null}
-              <div className="p-4">
-                <h3 className="font-bold">{preview.eventTitle}</h3>
-                <p className="mt-2 text-sm text-slate-300">{preview.invitationText}</p>
-                <p className="mt-3 text-xs text-emerald-200">
-                  {preview.hostname ?? dictionary.host.notAvailable}
-                </p>
-                <p className="mt-3 text-[11px] text-slate-400">
-                  {dictionary.host.whatsAppApproximation}
-                </p>
-              </div>
-            </section>
-            <section className="overflow-hidden rounded-3xl border border-white/10 bg-white text-slate-900 shadow-xl">
-              <p className="bg-slate-100 p-3 text-xs font-bold text-slate-600">
-                {dictionary.host.socialPreview}
-              </p>
-              {preview.publicThumbnailRef ? (
-                <img
-                  src={preview.publicThumbnailRef}
-                  alt={preview.thumbnailAltText}
-                  className="h-40 w-full object-cover"
-                />
-              ) : null}
-              <div className="p-4">
-                <h3 className="font-bold">{preview.eventTitle}</h3>
-                <p className="mt-2 text-sm text-slate-600">{preview.invitationText}</p>
-                <p className="mt-3 text-xs uppercase text-slate-500">
-                  {preview.hostname ?? dictionary.host.notAvailable}
-                </p>
-              </div>
-            </section>
-            <section className="rounded-3xl border border-white/10 bg-slate-950 p-4 md:col-span-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-violet-300">
-                {dictionary.host.smsPreview}
-              </p>
-              <p className="mt-3 rounded-2xl bg-blue-500 p-4 text-sm text-white sm:ml-auto sm:max-w-md">
-                {smsText}
-              </p>
-              <p className="mt-2 text-right text-xs text-slate-400">
-                {dictionary.host.characterCount.replace(
-                  '{count}',
-                  String(Array.from(smsText).length),
-                )}
-              </p>
-            </section>
-            <section className="rounded-3xl border border-white/10 bg-slate-950 p-4 md:col-span-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
-                {dictionary.host.calendarPreview}
-              </p>
-              <h3 className="mt-3 font-bold">{preview.calendar.title}</h3>
-              <p className="mt-2 text-sm text-slate-300">
-                {new Intl.DateTimeFormat(preview.locale, {
-                  dateStyle: 'full',
-                  timeStyle: 'short',
-                  timeZone: preview.calendar.timezone,
-                }).format(new Date(preview.calendar.startsAt))}
-              </p>
-              {preview.calendar.location ? (
-                <p className="mt-1 text-sm text-slate-400">{preview.calendar.location}</p>
-              ) : null}
-            </section>
-          </div>
-        )}
-        <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-          {dictionary.host.smsUnavailable}
-        </div>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          {preview ? (
-            <>
-              <TemplateCopyButton
-                text={preview.invitationText}
-                label={dictionary.host.copyInvitationText}
-                copied={copiedTemplate === 'invitation'}
-                onCopied={() => setCopiedTemplateTemporarily('invitation', setCopiedTemplate)}
-              />
-              <TemplateCopyButton
-                text={smsText}
-                label={dictionary.host.copySmsText}
-                copied={copiedTemplate === 'sms'}
-                onCopied={() => setCopiedTemplateTemporarily('sms', setCopiedTemplate)}
-              />
-              <TemplateCopyButton
-                text={preview.calendar.googleCalendarUrl}
-                label={dictionary.host.copyCalendarLink}
-                copied={copiedTemplate === 'calendar'}
-                onCopied={() => setCopiedTemplateTemporarily('calendar', setCopiedTemplate)}
-              />
-            </>
-          ) : null}
-          {publicUrl ? (
-            <button onClick={onCopy} className="rounded-xl bg-cyan-600 px-5 py-3 font-bold">
-              {copied ? dictionary.host.copied : dictionary.host.copyLink}
-            </button>
-          ) : (
-            <p className="text-sm text-amber-200">
-              {guest.invitation ? dictionary.host.linkUnavailable : dictionary.host.generateToCopy}
-            </p>
-          )}
-          <p className="text-xs text-slate-400">{dictionary.host.linkSecurityNote}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TemplateCopyButton({
-  text,
-  label,
-  copied,
-  onCopied,
-}: {
-  text: string;
-  label: string;
-  copied: boolean;
-  onCopied: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => void navigator.clipboard.writeText(text).then(onCopied)}
-      className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold"
-    >
-      {copied ? '✓' : label}
-    </button>
-  );
-}
-
-function EmailPreviewModal({
-  guest,
-  preview,
-  dictionary,
-  onClose,
-}: {
-  guest: HostGuest;
-  preview: EmailPreview | null;
-  dictionary: Dictionary;
-  onClose: () => void;
-}) {
-  const [mobile, setMobile] = useState(false);
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={dictionary.host.emailPreview}
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 p-4 backdrop-blur-sm"
-    >
-      <div className="mx-auto my-6 max-w-5xl rounded-3xl border border-white/15 bg-slate-900 p-5 shadow-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
-              {dictionary.host.emailPreview}
-            </p>
-            <h2 className="mt-1 text-xl font-black">{guest.displayName}</h2>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMobile((value) => !value)}
-              className="rounded-xl bg-white/10 px-4 py-2"
-            >
-              {mobile ? dictionary.host.desktopPreview : dictionary.host.mobilePreview}
-            </button>
-            <button onClick={onClose} className="rounded-xl bg-slate-700 px-4 py-2">
-              {dictionary.host.closePreview}
-            </button>
-          </div>
-        </div>
-        {!preview ? (
-          <p className="mt-6 text-slate-300">{dictionary.host.loadingPreview}</p>
-        ) : (
-          <div className="mt-5">
-            <p className="mb-3 rounded-xl bg-slate-950 p-3 text-sm">
-              <strong>{dictionary.host.emailSubject}:</strong> {preview.subject}
-            </p>
-            <div className="overflow-x-auto rounded-2xl bg-slate-950 p-3">
-              <iframe
-                title={dictionary.host.emailPreview}
-                sandbox=""
-                srcDoc={preview.html}
-                className="mx-auto h-[680px] rounded-xl bg-white transition-[width]"
-                style={{ width: mobile ? 390 : 680, maxWidth: '100%' }}
-              />
-            </div>
-            <p className="mt-3 text-xs text-slate-400">{dictionary.host.previewUsesPlaceholder}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function setCopiedTemplateTemporarily(value: string, setValue: (value: string | null) => void) {
-  setValue(value);
-  window.setTimeout(() => setValue(null), 1800);
 }
 
 function RsvpDetailModal({
