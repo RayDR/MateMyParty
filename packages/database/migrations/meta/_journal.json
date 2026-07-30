@@ -64,6 +64,13 @@
       "when": 1785122767632,
       "tag": "0008_fancy_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785358648878,
+      "tag": "0009_careful_ironclad",
+      "breakpoints": true
     }
   ]
 }

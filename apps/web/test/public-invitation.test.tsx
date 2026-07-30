@@ -55,6 +55,55 @@ describe('/i/[token] content', () => {
     expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).not.toBeInTheDocument();
   });
 
+  it('records an opening only after the explicit open action', () => {
+    mockAudioPlay();
+    const token = 'A'.repeat(43);
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ opened: true }));
+
+    render(
+      <PublicInvitation invitation={privateInvitation} initialLocale="en-US" accessToken={token} />,
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    openSummary();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/internal/invitation/open',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: expect.objectContaining({
+          'x-mmp-csrf': '1',
+          'x-invitation-token': token,
+        }),
+      }),
+    );
+  });
+
+  it('does not record an opening from the host preview', () => {
+    mockAudioPlay();
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ opened: true }));
+
+    render(
+      <PublicInvitation
+        invitation={privateInvitation}
+        initialLocale="en-US"
+        preview
+        accessToken={'A'.repeat(43)}
+      />,
+    );
+
+    openSummary();
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/internal/invitation/open', expect.anything());
+  });
+
   it('unlocks audio with the first gesture and reveals only the private summary', () => {
     const play = mockAudioPlay();
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);

@@ -139,6 +139,9 @@ class MemoryInvitationsRepository {
       publicTokenPrefix: values.publicTokenPrefix,
       status: values.status ?? 'READY',
       locale: values.locale,
+      firstVisitedAt: null,
+      lastVisitedAt: null,
+      visitCount: 0,
       firstOpenedAt: null,
       lastOpenedAt: null,
       openCount: 0,
@@ -208,6 +211,15 @@ class MemoryInvitationsRepository {
         }
       : null;
   }
+  async recordVisit(id: string, now: Date) {
+    const row = await this.findById(id);
+    if (!row || row.revokedAt) return null;
+    row.firstVisitedAt ??= now;
+    row.lastVisitedAt = now;
+    row.visitCount += 1;
+    return row;
+  }
+
   async recordOpen(id: string, now: Date) {
     const row = await this.findById(id);
     if (!row || row.revokedAt) return null;
@@ -260,25 +272,37 @@ describe('InvitationsService lifecycle', () => {
     await expect(service.createForGuest(guest.id)).rejects.toMatchObject({ status: 404 });
   });
 
-  it('tracks first and later openings without changing the first timestamp', async () => {
+  it('tracks visits separately from explicit invitation openings', async () => {
     const { repository, service } = setup();
     const created = await service.createForGuest(guest.id);
+
     const first = await service.resolveAndTrack(created.token, {});
-    const firstOpenedAt = repository.invitations[0]!.firstOpenedAt;
+    const firstVisitedAt = repository.invitations[0]!.firstVisitedAt;
+
     expect(first.openedPreviously).toBe(false);
+    expect(repository.invitations[0]!.visitCount).toBe(1);
+    expect(repository.invitations[0]!.openCount).toBe(0);
     expect(first.tools.calendar.filename).toBe('matemyparty-raymundo-6.ics');
     expect(first.tools.maps).toBeNull();
     expect(JSON.stringify(first.tools.calendar)).not.toContain(created.token);
     expect(JSON.stringify(first.tools.calendar)).not.toContain(guest.displayName);
     expect(JSON.stringify(first.tools.calendar)).not.toContain('@example.test');
+
+    await service.recordOpen(created.token, undefined, {});
+
+    expect(repository.invitations[0]!.openCount).toBe(1);
+    expect(repository.invitations[0]!.status).toBe('OPENED');
+
     const second = await service.resolveAndTrack(created.token, {});
+
     expect(second.openedPreviously).toBe(true);
-    expect(repository.invitations[0]!.firstOpenedAt).toEqual(firstOpenedAt);
+    expect(repository.invitations[0]!.firstVisitedAt).toEqual(firstVisitedAt);
+    expect(repository.invitations[0]!.visitCount).toBe(2);
+    expect(repository.invitations[0]!.openCount).toBe(1);
     expect(repository.invitations[0]!.lastOpenedAt).toBeInstanceOf(Date);
-    expect(repository.invitations[0]!.openCount).toBe(2);
   });
 
-  it('renders through a short-lived grant and records the open only when rendered', async () => {
+  it('renders through a short-lived grant and records a visit without opening', async () => {
     const { repository, service, tokens } = setup();
     const created = await service.createForGuest(guest.id);
     const generated = tokens.generate();
@@ -293,11 +317,16 @@ describe('InvitationsService lifecycle', () => {
       createdAt: new Date(),
       revokedAt: null,
     });
+
+    expect(repository.invitations[0]!.visitCount).toBe(0);
     expect(repository.invitations[0]!.openCount).toBe(0);
+
     await expect(service.resolveGrantAndTrack(generated.token, {})).resolves.toMatchObject({
       guestDisplayName: 'Family Sample',
     });
-    expect(repository.invitations[0]!.openCount).toBe(1);
+
+    expect(repository.invitations[0]!.visitCount).toBe(1);
+    expect(repository.invitations[0]!.openCount).toBe(0);
     expect(repository.grants[0]!.lastUsedAt).toBeInstanceOf(Date);
   });
 

@@ -238,6 +238,26 @@ export class InvitationsRepository {
     return { ...row, localizations, primaryHostname, rsvp: currentRsvp[0] ?? null };
   }
 
+  async recordVisit(id: string, now: Date, executor: DatabaseExecutor) {
+    const rows = await executor
+      .update(invitations)
+      .set({
+        firstVisitedAt: sql`coalesce(${invitations.firstVisitedAt}, ${now})`,
+        lastVisitedAt: now,
+        visitCount: sql`${invitations.visitCount} + 1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(invitations.id, id),
+          isNull(invitations.revokedAt),
+          sql`exists (select 1 from ${guests} where ${guests.id} = ${invitations.guestId} and ${guests.archivedAt} is null)`,
+        ),
+      )
+      .returning();
+    return rows[0] ?? null;
+  }
+
   async recordOpen(id: string, now: Date, executor: DatabaseExecutor) {
     const rows = await executor
       .update(invitations)
