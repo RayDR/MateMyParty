@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HostGuest } from '@matemyparty/contracts';
 import { HostGuestPanel } from '../components/host-guest-panel';
 import { hostEventDetail } from './host-event-fixture';
+import { privateInvitation } from './public-experience-fixture';
 
 const guest: HostGuest = {
   id: '55555555-5555-4555-8555-555555555555',
@@ -37,6 +38,11 @@ function response(value: unknown) {
 function mockRequests(currentGuest: HostGuest = guest) {
   const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes('/presentation-preview'))
+      return response({
+        landing: {},
+        invitation: privateInvitation,
+      });
     if (url.includes('/share-preview'))
       return response({
         eventTitle: 'Raymundo’s 6th Birthday',
@@ -276,20 +282,42 @@ describe('host guest management screen', () => {
     expect(screen.getAllByRole('heading', { name: 'Family Sample' }).length).toBeGreaterThan(0);
   });
 
-  it('shows localized sharing, social, SMS, and calendar previews without claiming delivery', async () => {
+  it('unifies invitation, message, and email previews in one mobile-safe dialog', async () => {
     mockRequests();
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     await screen.findByRole('heading', { name: 'Family Sample' });
+
     await userEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
-    expect(
-      await screen.findByRole('dialog', { name: 'Invitation sharing preview' }),
-    ).toBeInTheDocument();
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Invitation sharing preview',
+    });
+
+    expect(dialog).toHaveClass('overflow-hidden');
+    expect(screen.getByRole('tab', { name: 'Social / Open Graph preview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByText(/Approximation only/)).toBeInTheDocument();
     expect(screen.getByText('SMS preview')).toBeInTheDocument();
     expect(screen.getByText(/characters/)).toBeInTheDocument();
     expect(screen.getByText('Calendar preview')).toBeInTheDocument();
     expect(screen.getByText(/SMS delivery is unavailable/i)).toBeInTheDocument();
-    expect(screen.getByText(/No SMS has been sent/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Preview invitation' }));
+
+    expect(await screen.findByTestId('unified-invitation-viewport')).toHaveAttribute(
+      'data-viewport',
+      'mobile',
+    );
+    expect(screen.getByRole('button', { name: 'Open invitation' })).toBeVisible();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Email preview' }));
+
+    expect(await screen.findByTitle('Email preview')).toHaveAttribute(
+      'srcdoc',
+      expect.stringContaining('Responsive invitation preview'),
+    );
   });
 
   it('previews real email HTML and sends through the CSRF-protected route', async () => {
@@ -314,13 +342,26 @@ describe('host guest management screen', () => {
         retryAvailable: false,
       },
     };
+    const originalClipboard = navigator.clipboard;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
     const fetchMock = mockRequests(emailGuest);
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     await screen.findByRole('heading', { name: 'Family Sample' });
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Preview email' })[0]!);
-    expect(await screen.findByRole('dialog', { name: 'Email preview' })).toBeInTheDocument();
-    expect(screen.getByTitle('Email preview')).toHaveAttribute(
+    expect(
+      await screen.findByRole('dialog', { name: 'Invitation sharing preview' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Email preview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(await screen.findByTitle('Email preview')).toHaveAttribute(
       'srcdoc',
       expect.stringContaining('Responsive invitation preview'),
     );
@@ -335,6 +376,15 @@ describe('host guest management screen', () => {
     expect(JSON.parse(String(sendRequest?.[1]?.body))).toMatchObject({
       regenerate: false,
       overridePreferredChannel: false,
+    });
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
+
+    expect(writeText).toHaveBeenCalledWith('https://raymundo6th.domoforge.com/i/private-once');
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
     });
   });
 });
