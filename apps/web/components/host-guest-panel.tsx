@@ -16,8 +16,28 @@ import type {
 } from '@matemyparty/contracts';
 import { getDictionary, type Dictionary, type Locale } from '@matemyparty/i18n';
 import { usePersistentLocale } from '../lib/use-persistent-locale';
+import { HostActionConfirmationDialog } from './host-action-confirmation-dialog';
 import { HostInvitationPreviewModal, type HostPreviewTab } from './host-invitation-preview-modal';
-import { Plus, X } from 'lucide-react';
+import {
+  Archive,
+  Ban,
+  ChevronDown,
+  CirclePlus,
+  Copy,
+  Eye,
+  Languages,
+  Mail,
+  MessageSquare,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Share2,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 
 type Filter =
   | 'all'
@@ -37,6 +57,14 @@ type InvitationResult = {
   guest?: HostGuest;
   invitation: InvitationSummary;
   publicUrl?: string;
+};
+
+type ConfirmationKind = 'regenerate' | 'revoke' | 'archive';
+
+type ConfirmationRequest = {
+  kind: ConfirmationKind;
+  guest: HostGuest;
+  resendEmail: boolean;
 };
 
 const emptyStatistics: GuestInvitationStatistics = {
@@ -92,6 +120,8 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
   const [error, setError] = useState(false);
   const [links, setLinks] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationRequest | null>(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
   const dictionary = getDictionary(locale);
 
   const load = useCallback(async () => {
@@ -269,12 +299,47 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     }
   }
 
-  async function sendEmail(guest: HostGuest) {
+  async function updateGuestLocale(guest: HostGuest, nextLocale: Locale) {
+    if (guest.locale === nextLocale) return;
+
+    setGuests((current) =>
+      current.map((currentGuest) =>
+        currentGuest.id === guest.id ? { ...currentGuest, locale: nextLocale } : currentGuest,
+      ),
+    );
+
+    try {
+      const response = await fetch(`/internal/host/guests/${guest.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ locale: nextLocale }),
+      });
+
+      if (!response.ok) throw new Error();
+
+      setError(false);
+      await load();
+    } catch {
+      setGuests((current) =>
+        current.map((currentGuest) =>
+          currentGuest.id === guest.id ? { ...currentGuest, locale: guest.locale } : currentGuest,
+        ),
+      );
+      setError(true);
+    }
+  }
+
+  async function sendEmail(
+    guest: HostGuest,
+    regenerateOverride?: boolean,
+    openPreviewAfter = false,
+  ): Promise<boolean> {
     const delivery = guest.emailDelivery;
-    if (!delivery?.eligibility.eligible) return;
-    const regenerate = delivery.eligibility.requiresRegeneration;
-    if (regenerate && !window.confirm(dictionary.host.confirmEmailRegeneration)) return;
+    if (!delivery?.eligibility.eligible) return false;
+
+    const regenerate = regenerateOverride ?? delivery.eligibility.requiresRegeneration;
     setEmailBusy(guest.id);
+
     try {
       const response = await fetch(`/internal/host/guests/${guest.id}/email/send`, {
         method: 'POST',
@@ -285,15 +350,27 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           overridePreferredChannel: false,
         }),
       });
+
       if (!response.ok) throw new Error();
+
       const result = (await response.json()) as SendInvitationEmailResult;
+
       if (result.publicUrl) {
         setLinks((current) => ({ ...current, [guest.id]: result.publicUrl! }));
+
+        if (openPreviewAfter) {
+          setPreviewTab('message');
+          setPreviewGuest({ ...guest, invitation: result.invitation });
+        }
       }
-      if (result.attempt.status === 'FAILED') setError(true);
+
+      const failed = result.attempt.status === 'FAILED';
       await load();
+      setError(failed);
+      return true;
     } catch {
       setError(true);
+      return false;
     } finally {
       setEmailBusy(null);
     }
@@ -311,38 +388,77 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
     await load();
   }
 
-  async function regenerate(guest: HostGuest) {
-    if (!guest.invitation) return;
+  async function regenerate(guest: HostGuest): Promise<boolean> {
+    if (!guest.invitation) return false;
+
     const result = (await post(
       `/internal/host/invitations/${guest.invitation.id}/regenerate`,
-      dictionary.host.confirmRegenerate,
     )) as InvitationResult | null;
-    if (result?.publicUrl) {
+
+    if (!result) return false;
+
+    if (result.publicUrl) {
       setLinks((current) => ({ ...current, [guest.id]: result.publicUrl! }));
       setPreviewTab('message');
       setPreviewGuest({ ...guest, invitation: result.invitation });
     }
+
     await load();
+    return true;
   }
 
-  async function mutateGuest(path: string, confirmation: string) {
-    if (await post(path, confirmation)) await load();
+  async function mutateGuest(path: string, confirmationMessage?: string): Promise<boolean> {
+    if (!(await post(path, confirmationMessage))) return false;
+    await load();
+    return true;
   }
 
-  async function revoke(guest: HostGuest) {
-    if (!guest.invitation) return;
-    if (
-      await post(
-        `/internal/host/invitations/${guest.invitation.id}/revoke`,
-        dictionary.host.confirmRevoke,
-      )
-    ) {
-      setLinks((current) => {
-        const next = { ...current };
-        delete next[guest.id];
-        return next;
-      });
-      await load();
+  async function revoke(guest: HostGuest): Promise<boolean> {
+    if (!guest.invitation) return false;
+
+    if (!(await post(`/internal/host/invitations/${guest.invitation.id}/revoke`))) {
+      return false;
+    }
+
+    setLinks((current) => {
+      const next = { ...current };
+      delete next[guest.id];
+      return next;
+    });
+
+    await load();
+    return true;
+  }
+
+  function requestConfirmation(kind: ConfirmationKind, guest: HostGuest) {
+    setConfirmation({
+      kind,
+      guest,
+      resendEmail: kind === 'regenerate' && Boolean(guest.emailDelivery?.eligibility.eligible),
+    });
+  }
+
+  async function performConfirmedAction() {
+    if (!confirmation) return;
+
+    setConfirmationBusy(true);
+
+    try {
+      let completed = false;
+
+      if (confirmation.kind === 'regenerate') {
+        completed = confirmation.resendEmail
+          ? await sendEmail(confirmation.guest, true, true)
+          : await regenerate(confirmation.guest);
+      } else if (confirmation.kind === 'revoke') {
+        completed = await revoke(confirmation.guest);
+      } else {
+        completed = await mutateGuest(`/internal/host/guests/${confirmation.guest.id}/archive`);
+      }
+
+      if (completed) setConfirmation(null);
+    } finally {
+      setConfirmationBusy(false);
     }
   }
 
@@ -517,7 +633,34 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
               <option value="archived">{dictionary.host.filterArchived}</option>
             </select>
           </div>
-          <p className="mt-2 text-xs text-slate-400">{dictionary.host.archivedGuestsHidden}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                ['all', dictionary.host.filterAll],
+                ['without', dictionary.host.filterWithoutInvitation],
+                ['notOpened', dictionary.host.filterNotOpened],
+                ['pending', dictionary.host.filterRsvpPending],
+                ['accepted', dictionary.host.filterRsvpAccepted],
+                ['cannotNotify', dictionary.host.filterCannotNotify],
+                ['archived', dictionary.host.filterArchived],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filter === value}
+                onClick={() => setFilter(value)}
+                className={`min-h-9 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                  filter === value
+                    ? 'border-cyan-300/50 bg-cyan-500/20 text-cyan-100'
+                    : 'border-white/10 bg-slate-950/60 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-400">{dictionary.host.archivedGuestsHidden}</p>
         </section>
 
         {loading ? (
@@ -541,16 +684,12 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                   onEdit={() => beginEdit(guest)}
                   onGenerate={() => void generate(guest)}
                   onCopy={() => void copy(guest.id)}
-                  onPreview={() => openPreview(guest, 'message', true)}
+                  onPreview={() => openPreview(guest, 'invitation')}
+                  onSocialPreview={() => openPreview(guest, 'message', true)}
                   onRsvp={() => void showRsvp(guest)}
-                  onRegenerate={() => void regenerate(guest)}
-                  onRevoke={() => void revoke(guest)}
-                  onArchive={() =>
-                    void mutateGuest(
-                      `/internal/host/guests/${guest.id}/archive`,
-                      dictionary.host.confirmArchive,
-                    )
-                  }
+                  onRegenerate={() => requestConfirmation('regenerate', guest)}
+                  onRevoke={() => requestConfirmation('revoke', guest)}
+                  onArchive={() => requestConfirmation('archive', guest)}
                   onRestore={() =>
                     void mutateGuest(
                       `/internal/host/guests/${guest.id}/restore`,
@@ -558,6 +697,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                     )
                   }
                   onEmailPreview={() => openPreview(guest, 'email')}
+                  onLocaleChange={(nextLocale) => updateGuestLocale(guest, nextLocale)}
                   onEmailSend={() => void sendEmail(guest)}
                   emailBusy={emailBusy === guest.id}
                 />
@@ -572,16 +712,12 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
               onEdit={beginEdit}
               onGenerate={(guest) => void generate(guest)}
               onCopy={(guest) => void copy(guest.id)}
-              onPreview={(guest) => openPreview(guest, 'message', true)}
+              onPreview={(guest) => openPreview(guest, 'invitation')}
+              onSocialPreview={(guest) => openPreview(guest, 'message', true)}
               onRsvp={(guest) => void showRsvp(guest)}
-              onRegenerate={(guest) => void regenerate(guest)}
-              onRevoke={(guest) => void revoke(guest)}
-              onArchive={(guest) =>
-                void mutateGuest(
-                  `/internal/host/guests/${guest.id}/archive`,
-                  dictionary.host.confirmArchive,
-                )
-              }
+              onRegenerate={(guest) => requestConfirmation('regenerate', guest)}
+              onRevoke={(guest) => requestConfirmation('revoke', guest)}
+              onArchive={(guest) => requestConfirmation('archive', guest)}
               onRestore={(guest) =>
                 void mutateGuest(
                   `/internal/host/guests/${guest.id}/restore`,
@@ -589,6 +725,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
                 )
               }
               onEmailPreview={(guest) => openPreview(guest, 'email')}
+              onLocaleChange={(guest, nextLocale) => updateGuestLocale(guest, nextLocale)}
               onEmailSend={(guest) => void sendEmail(guest)}
               emailBusy={emailBusy}
             />
@@ -606,6 +743,55 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           linkCopied={copied === previewGuest.id}
           onCopy={() => void copy(previewGuest.id)}
           onClose={() => setPreviewGuest(null)}
+        />
+      ) : null}
+      {confirmation ? (
+        <HostActionConfirmationDialog
+          title={
+            confirmation.kind === 'regenerate'
+              ? dictionary.host.regenerateTitle
+              : confirmation.kind === 'revoke'
+                ? dictionary.host.revokeTitle
+                : dictionary.host.archiveTitle
+          }
+          description={
+            confirmation.kind === 'regenerate'
+              ? dictionary.host.regenerateDescription
+              : confirmation.kind === 'revoke'
+                ? dictionary.host.revokeDescription
+                : dictionary.host.archiveDescription
+          }
+          confirmLabel={
+            confirmation.kind === 'regenerate'
+              ? dictionary.host.regenerate
+              : confirmation.kind === 'revoke'
+                ? dictionary.host.revoke
+                : dictionary.host.archive
+          }
+          cancelLabel={dictionary.host.cancel}
+          closeLabel={dictionary.host.closeDialog}
+          variant={confirmation.kind === 'revoke' ? 'danger' : 'warning'}
+          busy={confirmationBusy}
+          checkbox={
+            confirmation.kind === 'regenerate'
+              ? {
+                  label: dictionary.host.resendInvitationEmail,
+                  checked: confirmation.resendEmail,
+                  disabled: !confirmation.guest.emailDelivery?.eligibility.eligible,
+                  helpText: !confirmation.guest.emailDelivery?.eligibility.eligible
+                    ? dictionary.host.resendEmailUnavailable
+                    : undefined,
+                  onChange: (checked: boolean) =>
+                    setConfirmation((current) =>
+                      current ? { ...current, resendEmail: checked } : current,
+                    ),
+                }
+              : undefined
+          }
+          onConfirm={() => void performConfirmedAction()}
+          onCancel={() => {
+            if (!confirmationBusy) setConfirmation(null);
+          }}
         />
       ) : null}
       {showForm ? (
@@ -975,83 +1161,310 @@ type GuestActionProps = {
   onGenerate: () => void;
   onCopy: () => void;
   onPreview: () => void;
+  onSocialPreview: () => void;
   onRsvp: () => void;
   onRegenerate: () => void;
   onRevoke: () => void;
   onArchive: () => void;
   onRestore: () => void;
   onEmailPreview: () => void;
+  onLocaleChange: (locale: Locale) => Promise<void>;
   onEmailSend: () => void;
   emailBusy: boolean;
 };
 
 function GuestActions(props: GuestActionProps) {
   const { guest, dictionary } = props;
+
   if (guest.archivedAt) {
-    return <ActionButton onClick={props.onRestore} label={dictionary.host.restore} />;
+    return (
+      <div className="inline-flex rounded-2xl border border-white/10 bg-slate-950/40 p-1">
+        <IconAction icon={RotateCcw} onClick={props.onRestore} label={dictionary.host.restore} />
+      </div>
+    );
   }
-  const activeInvitation = guest.invitation && !guest.invitation.revokedAt;
+
   return (
-    <div className="flex flex-wrap gap-2">
-      <ActionButton onClick={props.onEdit} label={dictionary.host.edit} />
-      <ActionButton onClick={props.onEmailPreview} label={dictionary.host.previewEmail} />
-      {guest.emailDelivery?.eligibility.eligible ? (
-        <ActionButton
-          primary
-          disabled={props.emailBusy}
-          onClick={props.onEmailSend}
-          label={
-            props.emailBusy
-              ? dictionary.host.sendingEmail
-              : guest.emailDelivery.eligibility.action === 'REGENERATE_AND_SEND'
-                ? dictionary.host.regenerateAndSendEmail
-                : dictionary.host.generateAndSendEmail
-          }
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="inline-flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/40 p-1">
+        <IconAction icon={Pencil} onClick={props.onEdit} label={dictionary.host.edit} />
+        <PreviewSplitButton
+          dictionary={dictionary}
+          onInvitation={props.onPreview}
+          onEmail={props.onEmailPreview}
+          onSocial={props.onSocialPreview}
         />
-      ) : null}
-      {!guest.invitation ? (
-        <ActionButton primary onClick={props.onGenerate} label={dictionary.host.createInvitation} />
-      ) : null}
-      <ActionButton onClick={props.onPreview} label={dictionary.host.preview} />
+      </div>
+
       {guest.invitation ? (
-        <ActionButton onClick={props.onRsvp} label={dictionary.host.rsvpDetails} />
+        <div className="inline-flex rounded-2xl border border-white/10 bg-slate-950/40 p-1">
+          <IconAction
+            icon={MessageSquare}
+            onClick={props.onRsvp}
+            label={dictionary.host.rsvpDetails}
+          />
+        </div>
       ) : null}
-      {props.hasLink && activeInvitation ? (
-        <ActionButton
-          onClick={props.onCopy}
-          label={props.copied ? dictionary.host.copied : dictionary.host.copyLink}
-        />
-      ) : null}
-      {guest.invitation ? (
-        <ActionButton warning onClick={props.onRegenerate} label={dictionary.host.regenerate} />
-      ) : null}
-      {activeInvitation ? (
-        <ActionButton danger onClick={props.onRevoke} label={dictionary.host.revoke} />
-      ) : null}
-      <ActionButton onClick={props.onArchive} label={dictionary.host.archive} />
+
+      <div className="inline-flex rounded-2xl border border-white/10 bg-slate-950/40 p-1">
+        <MoreActionsMenu {...props} />
+      </div>
     </div>
+  );
+}
+
+function PreviewSplitButton({
+  dictionary,
+  onInvitation,
+  onEmail,
+  onSocial,
+}: {
+  dictionary: Dictionary;
+  onInvitation: () => void;
+  onEmail: () => void;
+  onSocial: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  function select(action: () => void) {
+    setOpen(false);
+    action();
+  }
+
+  return (
+    <div
+      className="relative inline-flex"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        type="button"
+        title={dictionary.host.previewInvitation}
+        aria-label={dictionary.host.preview}
+        onClick={(event) => {
+          event.stopPropagation();
+          onInvitation();
+        }}
+        className="flex size-10 items-center justify-center rounded-l-xl bg-slate-700 text-slate-100 transition hover:bg-slate-600"
+      >
+        <Eye aria-hidden size={18} />
+      </button>
+
+      <button
+        type="button"
+        title={dictionary.host.previewOptions}
+        aria-label={dictionary.host.previewOptions}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+        className="flex h-10 w-7 items-center justify-center rounded-r-xl border-l border-white/10 bg-slate-700 text-slate-200 transition hover:bg-slate-600"
+      >
+        <ChevronDown aria-hidden size={15} />
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-40 mt-2 w-52 overflow-hidden rounded-2xl border border-white/15 bg-slate-950 p-1.5 shadow-2xl"
+        >
+          <MenuAction
+            icon={Eye}
+            label={dictionary.host.previewInvitation}
+            onClick={() => select(onInvitation)}
+          />
+          <MenuAction
+            icon={Mail}
+            label={dictionary.host.emailPreview}
+            onClick={() => select(onEmail)}
+          />
+          <MenuAction
+            icon={Share2}
+            label={dictionary.host.socialPreview}
+            onClick={() => select(onSocial)}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MoreActionsMenu(props: GuestActionProps) {
+  const [open, setOpen] = useState(false);
+  const { guest, dictionary } = props;
+  const activeInvitation = Boolean(guest.invitation && !guest.invitation.revokedAt);
+  const canSendInitialEmail =
+    !guest.invitation && Boolean(guest.emailDelivery?.eligibility.eligible);
+
+  function select(action: () => void) {
+    setOpen(false);
+    action();
+  }
+
+  return (
+    <div
+      className="relative"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        type="button"
+        title={dictionary.host.moreActions}
+        aria-label={dictionary.host.moreActions}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+        className="flex size-10 items-center justify-center rounded-xl bg-slate-700 text-slate-100 transition hover:bg-slate-600"
+      >
+        <MoreHorizontal aria-hidden size={19} />
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-2xl border border-white/15 bg-slate-950 p-1.5 shadow-2xl"
+        >
+          {canSendInitialEmail ? (
+            <MenuAction
+              icon={props.emailBusy ? RefreshCw : Send}
+              label={
+                props.emailBusy
+                  ? dictionary.host.sendingEmail
+                  : dictionary.host.generateAndSendEmail
+              }
+              disabled={props.emailBusy}
+              onClick={() => select(props.onEmailSend)}
+            />
+          ) : null}
+
+          {!guest.invitation ? (
+            <MenuAction
+              icon={CirclePlus}
+              label={dictionary.host.createInvitation}
+              onClick={() => select(props.onGenerate)}
+            />
+          ) : null}
+
+          {props.hasLink && activeInvitation ? (
+            <MenuAction
+              icon={Copy}
+              label={props.copied ? dictionary.host.copied : dictionary.host.copyLink}
+              onClick={() => select(props.onCopy)}
+            />
+          ) : null}
+
+          {guest.invitation ? (
+            <>
+              <div className="my-1 border-t border-white/10" />
+              <MenuAction
+                icon={RefreshCw}
+                label={dictionary.host.regenerate}
+                tone="warning"
+                onClick={() => select(props.onRegenerate)}
+              />
+            </>
+          ) : null}
+
+          {activeInvitation ? (
+            <MenuAction
+              icon={Ban}
+              label={dictionary.host.revoke}
+              tone="danger"
+              onClick={() => select(props.onRevoke)}
+            />
+          ) : null}
+
+          <MenuAction
+            icon={Archive}
+            label={dictionary.host.archive}
+            onClick={() => select(props.onArchive)}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuAction({
+  icon: Icon,
+  label,
+  onClick,
+  tone = 'default',
+  disabled,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  tone?: 'default' | 'warning' | 'danger';
+  disabled?: boolean;
+}) {
+  const color =
+    tone === 'danger'
+      ? 'text-red-200 hover:bg-red-500/15'
+      : tone === 'warning'
+        ? 'text-amber-200 hover:bg-amber-500/15'
+        : 'text-slate-200 hover:bg-white/10';
+
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className={`flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold disabled:cursor-wait disabled:opacity-50 ${color}`}
+    >
+      <Icon aria-hidden size={17} className={disabled ? 'animate-spin' : undefined} />
+      <span>{label}</span>
+    </button>
   );
 }
 
 function GuestCard(props: GuestActionProps & { locale: Locale }) {
   const { guest, dictionary, locale } = props;
+
   return (
     <article className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-xl">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">{guest.displayName}</h2>
-          <p className="mt-1 text-sm text-slate-300">{countLabel(guest, dictionary)}</p>
+        <div className="min-w-0">
+          <h2 className="truncate text-xl font-bold">{guest.displayName}</h2>
+          <div className="mt-1">
+            <InlineLocaleEditor
+              guest={guest}
+              dictionary={dictionary}
+              onChange={props.onLocaleChange}
+            />
+          </div>
+          <p className="mt-2 text-sm text-slate-300">{countLabel(guest, dictionary)}</p>
         </div>
         <StatusBadge guest={guest} dictionary={dictionary} />
       </div>
+
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <ContactSummary guest={guest} dictionary={dictionary} />
-        <InvitationOpeningSummary guest={guest} dictionary={dictionary} locale={locale} />
-        <RsvpSummary guest={guest} dictionary={dictionary} locale={locale} />
+        <NotificationDeliverySummary guest={guest} dictionary={dictionary} locale={locale} />
+        <InvitationActivitySummary guest={guest} dictionary={dictionary} locale={locale} />
+        <RsvpSummary
+          guest={guest}
+          dictionary={dictionary}
+          locale={locale}
+          onClick={guest.invitation ? props.onRsvp : undefined}
+        />
       </div>
-      <div className="mt-4">
-        <EmailDeliverySummary guest={guest} dictionary={dictionary} locale={locale} />
-      </div>
+
       <div className="mt-5 border-t border-white/10 pt-4">
         <GuestActions {...props} />
       </div>
@@ -1076,54 +1489,86 @@ function GuestTable({
   onGenerate: (guest: HostGuest) => void;
   onCopy: (guest: HostGuest) => void;
   onPreview: (guest: HostGuest) => void;
+  onSocialPreview: (guest: HostGuest) => void;
   onRsvp: (guest: HostGuest) => void;
   onRegenerate: (guest: HostGuest) => void;
   onRevoke: (guest: HostGuest) => void;
   onArchive: (guest: HostGuest) => void;
   onRestore: (guest: HostGuest) => void;
   onEmailPreview: (guest: HostGuest) => void;
+  onLocaleChange: (guest: HostGuest, locale: Locale) => Promise<void>;
   onEmailSend: (guest: HostGuest) => void;
   emailBusy: string | null;
 }) {
   return (
-    <div className="hidden overflow-x-auto rounded-3xl border border-white/10 bg-slate-900/80 lg:block">
-      <table className="w-full min-w-[1050px] text-left text-sm">
-        <thead className="bg-white/5 text-xs uppercase tracking-wide text-slate-300">
+    <div className="hidden max-h-[70vh] overflow-auto rounded-3xl border border-white/10 bg-slate-900/80 lg:block">
+      <table className="w-full min-w-[940px] table-fixed text-left text-sm">
+        <thead className="sticky top-0 z-20 bg-slate-900/95 text-xs uppercase tracking-wide text-slate-300 backdrop-blur">
           <tr>
-            <th className="p-4">{dictionary.host.displayName}</th>
-            <th className="p-4">{dictionary.host.invited}</th>
-            <th className="p-4">{dictionary.host.contacts}</th>
-            <th className="p-4">{dictionary.host.notificationEligibility}</th>
-            <th className="p-4">{dictionary.host.status}</th>
-            <th className="p-4">{dictionary.host.openCount}</th>
-            <th className="p-4">{dictionary.host.rsvpSummary}</th>
-            <th className="p-4">{dictionary.host.actions}</th>
+            <th className="w-[17%] p-4">{dictionary.host.displayName}</th>
+            <th className="w-[12%] p-4">{dictionary.host.invited}</th>
+            <th className="w-[22%] p-4">{dictionary.host.contacts}</th>
+            <th className="w-[16%] p-4">{dictionary.host.status}</th>
+            <th className="w-[15%] p-4">{dictionary.host.rsvpSummary}</th>
+            <th className="w-[18%] p-4">{dictionary.host.actions}</th>
           </tr>
         </thead>
+
         <tbody>
           {guests.map((guest) => (
-            <tr key={guest.id} className="border-t border-white/10 align-top">
+            <tr
+              key={guest.id}
+              className="border-t border-white/10 align-top transition hover:bg-white/[0.025]"
+            >
               <td className="p-4">
-                <strong className="text-base">{guest.displayName}</strong>
-                <p className="mt-1 text-xs text-slate-400">{guest.locale}</p>
+                <button
+                  type="button"
+                  onClick={() => actions.onEdit(guest)}
+                  className="max-w-full truncate text-left text-base font-bold text-white hover:text-cyan-200"
+                >
+                  {guest.displayName}
+                </button>
+                <div className="mt-2">
+                  <InlineLocaleEditor
+                    guest={guest}
+                    dictionary={dictionary}
+                    onChange={(nextLocale) => actions.onLocaleChange(guest, nextLocale)}
+                  />
+                </div>
               </td>
-              <td className="p-4">{countLabel(guest, dictionary)}</td>
+
+              <td className="p-4">
+                <p className="font-bold text-white">{guest.totalInvited}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  {countLabel(guest, dictionary)}
+                </p>
+              </td>
+
               <td className="p-4">
                 <ContactSummary guest={guest} dictionary={dictionary} />
+                <div className="mt-3">
+                  <NotificationDeliverySummary
+                    guest={guest}
+                    dictionary={dictionary}
+                    locale={locale}
+                  />
+                </div>
               </td>
-              <td className="max-w-52 p-4">
-                <EmailDeliverySummary guest={guest} dictionary={dictionary} locale={locale} />
-              </td>
+
               <td className="p-4">
-                <StatusBadge guest={guest} dictionary={dictionary} />
+                <InvitationActivitySummary guest={guest} dictionary={dictionary} locale={locale} />
               </td>
+
               <td className="p-4">
-                <InvitationOpeningSummary guest={guest} dictionary={dictionary} locale={locale} />
+                <RsvpSummary
+                  guest={guest}
+                  dictionary={dictionary}
+                  locale={locale}
+                  onClick={guest.invitation ? () => actions.onRsvp(guest) : undefined}
+                />
               </td>
+
               <td className="p-4">
-                <RsvpSummary guest={guest} dictionary={dictionary} locale={locale} />
-              </td>
-              <td className="max-w-80 p-4">
                 <GuestActions
                   guest={guest}
                   dictionary={dictionary}
@@ -1133,12 +1578,14 @@ function GuestTable({
                   onGenerate={() => actions.onGenerate(guest)}
                   onCopy={() => actions.onCopy(guest)}
                   onPreview={() => actions.onPreview(guest)}
+                  onSocialPreview={() => actions.onSocialPreview(guest)}
                   onRsvp={() => actions.onRsvp(guest)}
                   onRegenerate={() => actions.onRegenerate(guest)}
                   onRevoke={() => actions.onRevoke(guest)}
                   onArchive={() => actions.onArchive(guest)}
                   onRestore={() => actions.onRestore(guest)}
                   onEmailPreview={() => actions.onEmailPreview(guest)}
+                  onLocaleChange={(nextLocale) => actions.onLocaleChange(guest, nextLocale)}
                   onEmailSend={() => actions.onEmailSend(guest)}
                   emailBusy={actions.emailBusy === guest.id}
                 />
@@ -1151,28 +1598,7 @@ function GuestTable({
   );
 }
 
-function Eligibility({ guest, dictionary }: { guest: HostGuest; dictionary: Dictionary }) {
-  if (guest.notificationEligibility.canNotifyAutomatically) {
-    return (
-      <span className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
-        ● {dictionary.host.canNotify}
-      </span>
-    );
-  }
-  const noContact = guest.notificationEligibility.reason === 'NO_CONTACT';
-  return (
-    <div
-      className={`rounded-xl border p-2 text-xs ${noContact ? 'border-red-400/30 bg-red-500/10 text-red-100' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'}`}
-    >
-      <strong>
-        {noContact ? dictionary.host.cannotNotify : dictionary.host.notificationNotConfigured}
-      </strong>
-      {noContact ? <p className="mt-1">{dictionary.host.contactMissing}</p> : null}
-    </div>
-  );
-}
-
-function EmailDeliverySummary({
+function NotificationDeliverySummary({
   guest,
   dictionary,
   locale,
@@ -1182,36 +1608,140 @@ function EmailDeliverySummary({
   locale: Locale;
 }) {
   const delivery = guest.emailDelivery;
-  if (!delivery) return <Eligibility guest={guest} dictionary={dictionary} />;
-  const last = delivery.lastAttempt;
+  const last = delivery?.lastAttempt;
+  const ready = guest.notificationEligibility.canNotifyAutomatically;
+
+  const label = last
+    ? `${dictionary.host.lastEmailStatus}: ${last.status}`
+    : ready
+      ? dictionary.host.automaticNotificationsReady
+      : dictionary.host.noContactShort;
+
+  const tone: 'success' | 'warning' | 'danger' =
+    last?.status === 'FAILED' ? 'danger' : ready ? 'success' : 'warning';
+
   return (
-    <div className="space-y-2 text-xs">
-      <Eligibility guest={guest} dictionary={dictionary} />
+    <CompactDisclosure label={label} tone={tone}>
+      <p>
+        {dictionary.host.preferredChannel}:{' '}
+        <strong>{channelLabel(guest.preferredChannel, dictionary)}</strong>
+      </p>
+
+      {!ready ? (
+        <p className="mt-1">
+          {guest.notificationEligibility.reason === 'NO_CONTACT'
+            ? dictionary.host.contactMissing
+            : dictionary.host.notificationNotConfigured}
+        </p>
+      ) : null}
+
       {last ? (
-        <div className="rounded-xl border border-white/10 bg-slate-950/50 p-2 text-slate-300">
-          <p>
-            {dictionary.host.lastEmailStatus}:{' '}
-            <strong className={last.status === 'FAILED' ? 'text-red-200' : 'text-cyan-100'}>
-              {last.status}
-            </strong>
-          </p>
-          <p>
+        <>
+          <p className="mt-1">
             {dictionary.host.lastEmailTime}:{' '}
-            <time>{formatDate(last.sentAt ?? last.updatedAt, locale, dictionary.host.never)}</time>
+            {formatDate(last.sentAt ?? last.updatedAt, locale, dictionary.host.never)}
           </p>
-          {delivery.retryAvailable ? (
-            <p className="mt-1 font-semibold text-amber-200">
-              {dictionary.host.emailRetryAvailable}
-            </p>
-          ) : null}
           {last.safeErrorMessage ? (
             <p className="mt-1 text-red-200">{last.safeErrorMessage}</p>
           ) : null}
-        </div>
+        </>
       ) : (
-        <p className="text-slate-400">{dictionary.host.noEmailAttempts}</p>
+        <p className="mt-1">{dictionary.host.emailNotSentShort}</p>
       )}
-    </div>
+    </CompactDisclosure>
+  );
+}
+
+function CompactDisclosure({
+  label,
+  tone,
+  children,
+}: {
+  label: string;
+  tone: 'neutral' | 'success' | 'warning' | 'danger';
+  children: React.ReactNode;
+}) {
+  const style =
+    tone === 'success'
+      ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-100'
+      : tone === 'warning'
+        ? 'border-amber-400/20 bg-amber-500/10 text-amber-100'
+        : tone === 'danger'
+          ? 'border-red-400/25 bg-red-500/10 text-red-100'
+          : 'border-white/10 bg-white/5 text-slate-200';
+
+  return (
+    <details className="group max-w-64 text-xs">
+      <summary
+        title={label}
+        className={`flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-xl border px-2.5 py-1.5 font-semibold ${style}`}
+      >
+        <span className="size-1.5 shrink-0 rounded-full bg-current" />
+        <span className="min-w-0 truncate">{label}</span>
+        <ChevronDown
+          aria-hidden
+          size={13}
+          className="ml-auto shrink-0 transition group-open:rotate-180"
+        />
+      </summary>
+      <div className="mt-2 rounded-xl border border-white/10 bg-slate-950/70 p-3 leading-5 text-slate-300">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function InlineLocaleEditor({
+  guest,
+  dictionary,
+  onChange,
+}: {
+  guest: HostGuest;
+  dictionary: Dictionary;
+  onChange: (locale: Locale) => Promise<void>;
+}) {
+  const [editingLocale, setEditingLocale] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const currentLabel =
+    guest.locale === 'es-MX' ? dictionary.common.spanish : dictionary.common.english;
+
+  if (editingLocale) {
+    return (
+      <select
+        autoFocus
+        aria-label={dictionary.host.changeLanguage}
+        value={guest.locale}
+        disabled={busy}
+        onBlur={() => {
+          if (!busy) setEditingLocale(false);
+        }}
+        onChange={async (event) => {
+          const nextLocale = event.target.value as Locale;
+          setBusy(true);
+          await onChange(nextLocale);
+          setBusy(false);
+          setEditingLocale(false);
+        }}
+        className="max-w-full rounded-lg border border-cyan-400/40 bg-slate-950 px-2 py-1 text-xs text-white outline-none"
+      >
+        <option value="en-US">{dictionary.common.english}</option>
+        <option value="es-MX">{dictionary.common.spanish}</option>
+      </select>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={dictionary.host.changeLanguage}
+      aria-label={`${dictionary.host.changeLanguage}: ${currentLabel}`}
+      onClick={() => setEditingLocale(true)}
+      className="inline-flex max-w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-xs text-slate-400 transition hover:bg-white/5 hover:text-cyan-200"
+    >
+      <Languages aria-hidden size={13} />
+      <span className="truncate">{currentLabel}</span>
+    </button>
   );
 }
 
@@ -1227,7 +1757,7 @@ function ContactSummary({ guest, dictionary }: { guest: HostGuest; dictionary: D
   );
 }
 
-function InvitationOpeningSummary({
+function InvitationActivitySummary({
   guest,
   dictionary,
   locale,
@@ -1236,20 +1766,26 @@ function InvitationOpeningSummary({
   dictionary: Dictionary;
   locale: Locale;
 }) {
-  if (!guest.invitation) return <span className="text-slate-400">{dictionary.host.never}</span>;
+  if (!guest.invitation) {
+    return <StatusBadge guest={guest} dictionary={dictionary} />;
+  }
+
   return (
-    <div className="space-y-1 text-xs text-slate-300">
-      <p>
-        {dictionary.host.openCount}: <strong>{guest.invitation.openCount}</strong>
-      </p>
-      <p>
-        {dictionary.host.firstOpened}:{' '}
-        {formatDate(guest.invitation.firstOpenedAt, locale, dictionary.host.never)}
-      </p>
-      <p>
-        {dictionary.host.lastOpened}:{' '}
-        {formatDate(guest.invitation.lastOpenedAt, locale, dictionary.host.never)}
-      </p>
+    <div className="space-y-2">
+      <StatusBadge guest={guest} dictionary={dictionary} />
+      <CompactDisclosure
+        label={dictionary.host.opensSummary.replace('{count}', String(guest.invitation.openCount))}
+        tone={guest.invitation.openCount > 0 ? 'success' : 'neutral'}
+      >
+        <p>
+          {dictionary.host.firstOpened}:{' '}
+          {formatDate(guest.invitation.firstOpenedAt, locale, dictionary.host.never)}
+        </p>
+        <p className="mt-1">
+          {dictionary.host.lastOpened}:{' '}
+          {formatDate(guest.invitation.lastOpenedAt, locale, dictionary.host.never)}
+        </p>
+      </CompactDisclosure>
     </div>
   );
 }
@@ -1258,47 +1794,66 @@ function RsvpSummary({
   guest,
   dictionary,
   locale,
+  onClick,
 }: {
   guest: HostGuest;
   dictionary: Dictionary;
   locale: Locale;
+  onClick?: () => void;
 }) {
   const response = guest.invitation?.rsvp;
+
   if (!guest.invitation || guest.invitation.revokedAt) {
     return <span className="text-xs text-slate-400">{dictionary.host.rsvpNotApplicable}</span>;
   }
-  if (!response) {
-    return (
-      <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs text-amber-100">
-        {dictionary.host.rsvpPending}
-      </span>
-    );
-  }
-  return (
-    <div className="text-xs text-slate-300">
+
+  const content = !response ? (
+    <span className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-100">
+      {dictionary.host.rsvpPending}
+    </span>
+  ) : (
+    <div className="text-left text-xs text-slate-300">
       <strong className="text-cyan-100">{hostRsvpStatus(response.status, dictionary)}</strong>
+
       {response.status === 'ACCEPTED' ? (
         <p className="mt-1">
           {dictionary.host.rsvpPeople.replace('{count}', String(response.totalAttending ?? 0))}
         </p>
       ) : null}
-      <div className="mt-1 flex flex-wrap gap-1 text-[0.7rem]">
-        {response.hasDietaryNotes ? (
-          <span className="rounded-full bg-violet-500/15 px-2 py-0.5">
-            {dictionary.host.rsvpDietaryIndicator}
-          </span>
-        ) : null}
-        {response.hasGuestMessage ? (
-          <span className="rounded-full bg-cyan-500/15 px-2 py-0.5">
-            {dictionary.host.rsvpMessageIndicator}
-          </span>
-        ) : null}
-      </div>
-      <time className="mt-1 block text-[0.7rem] text-slate-500">
-        {dictionary.host.rsvpLastResponse}:{' '}
+
+      {response.hasDietaryNotes || response.hasGuestMessage ? (
+        <div className="mt-1 flex flex-wrap gap-1 text-[0.68rem]">
+          {response.hasDietaryNotes ? (
+            <span className="rounded-full bg-violet-500/15 px-2 py-0.5">
+              {dictionary.host.rsvpDietaryIndicator}
+            </span>
+          ) : null}
+          {response.hasGuestMessage ? (
+            <span className="rounded-full bg-cyan-500/15 px-2 py-0.5">
+              {dictionary.host.rsvpMessageIndicator}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      <time className="mt-1 block text-[0.68rem] text-slate-500">
         {formatDate(response.updatedAt, locale, dictionary.host.never)}
       </time>
     </div>
+  );
+
+  return onClick ? (
+    <button
+      type="button"
+      title={dictionary.host.rsvpDetails}
+      aria-label={dictionary.host.rsvpDetails}
+      onClick={onClick}
+      className="rounded-xl p-1.5 text-left transition hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+    >
+      {content}
+    </button>
+  ) : (
+    content
   );
 }
 
@@ -1423,7 +1978,8 @@ function hostRsvpStatus(status: RsvpStatus, dictionary: Dictionary) {
   }[status];
 }
 
-function ActionButton({
+function IconAction({
+  icon: Icon,
   label,
   onClick,
   primary,
@@ -1431,6 +1987,7 @@ function ActionButton({
   danger,
   disabled,
 }: {
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
   primary?: boolean;
@@ -1439,21 +1996,35 @@ function ActionButton({
   disabled?: boolean;
 }) {
   const color = danger
-    ? 'bg-red-800 hover:bg-red-700'
+    ? 'bg-red-800 text-red-50 hover:bg-red-700'
     : warning
-      ? 'bg-amber-700 hover:bg-amber-600'
+      ? 'bg-amber-700 text-amber-50 hover:bg-amber-600'
       : primary
-        ? 'bg-violet-600 hover:bg-violet-500'
-        : 'bg-slate-700 hover:bg-slate-600';
+        ? 'bg-violet-600 text-white hover:bg-violet-500'
+        : 'bg-slate-700 text-slate-100 hover:bg-slate-600';
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${color}`}
-    >
-      {label}
-    </button>
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        title={label}
+        aria-label={label}
+        disabled={disabled}
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        className={`flex size-10 items-center justify-center rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${color}`}
+      >
+        <Icon aria-hidden size={18} className={disabled ? 'animate-spin' : undefined} />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-xl group-hover:block group-focus-within:block"
+      >
+        {label}
+      </span>
+    </span>
   );
 }
 
