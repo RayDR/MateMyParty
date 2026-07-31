@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HostGuest } from '@matemyparty/contracts';
@@ -35,7 +35,9 @@ function response(value: unknown) {
   return Promise.resolve({ ok: true, json: async () => value });
 }
 
-function mockRequests(currentGuest: HostGuest = guest) {
+function mockRequests(initialGuest: HostGuest = guest) {
+  let currentGuest = initialGuest;
+
   const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes('/presentation-preview'))
@@ -116,42 +118,62 @@ function mockRequests(currentGuest: HostGuest = guest) {
         publicThumbnailUrl: null,
         usesPlaceholderLink: true,
       });
-    if (url.includes('/email/send'))
+    if (url.includes('/email/send')) {
+      const sentAttempt = {
+        id: '99999999-9999-4999-8999-999999999999',
+        invitationId: '77777777-7777-4777-8777-777777777777',
+        status: 'SENT' as const,
+        provider: 'stub',
+        providerStatus: 'ACCEPTED',
+        attemptNumber: 1,
+        locale: 'en-US' as const,
+        subject: 'Invitation: Raymundo birthday',
+        retryable: false,
+        safeErrorCode: null,
+        safeErrorMessage: null,
+        queuedAt: '2026-07-27T00:00:00.000Z',
+        sentAt: '2026-07-27T00:00:01.000Z',
+        deliveredAt: null,
+        failedAt: null,
+        createdAt: '2026-07-27T00:00:00.000Z',
+        updatedAt: '2026-07-27T00:00:01.000Z',
+      };
+
+      const sentInvitation = {
+        id: '77777777-7777-4777-8777-777777777777',
+        status: 'SENT' as const,
+        locale: 'en-US' as const,
+        tokenPrefix: 'abcdefgh',
+        firstOpenedAt: null,
+        lastOpenedAt: null,
+        openCount: 0,
+        createdAt: '2026-07-27T00:00:00.000Z',
+        updatedAt: '2026-07-27T00:00:01.000Z',
+        revokedAt: null,
+      };
+
+      currentGuest = {
+        ...currentGuest,
+        invitation: sentInvitation,
+        emailDelivery: {
+          eligibility: {
+            eligible: true,
+            action: 'REGENERATE_AND_SEND',
+            reason: 'TOKEN_REGENERATION_REQUIRED',
+            requiresRegeneration: true,
+          },
+          lastAttempt: sentAttempt,
+          retryAvailable: false,
+        },
+      };
+
       return response({
-        attempt: {
-          id: '99999999-9999-4999-8999-999999999999',
-          invitationId: '77777777-7777-4777-8777-777777777777',
-          status: 'SENT',
-          provider: 'stub',
-          providerStatus: 'ACCEPTED',
-          attemptNumber: 1,
-          locale: 'en-US',
-          subject: 'Invitation: Raymundo birthday',
-          retryable: false,
-          safeErrorCode: null,
-          safeErrorMessage: null,
-          queuedAt: '2026-07-27T00:00:00.000Z',
-          sentAt: '2026-07-27T00:00:01.000Z',
-          deliveredAt: null,
-          failedAt: null,
-          createdAt: '2026-07-27T00:00:00.000Z',
-          updatedAt: '2026-07-27T00:00:01.000Z',
-        },
-        invitation: {
-          id: '77777777-7777-4777-8777-777777777777',
-          status: 'SENT',
-          locale: 'en-US',
-          tokenPrefix: 'abcdefgh',
-          firstOpenedAt: null,
-          lastOpenedAt: null,
-          openCount: 0,
-          createdAt: '2026-07-27T00:00:00.000Z',
-          updatedAt: '2026-07-27T00:00:01.000Z',
-          revokedAt: null,
-        },
+        attempt: sentAttempt,
+        invitation: sentInvitation,
         publicUrl: 'https://raymundo6th.domoforge.com/i/private-once',
         duplicate: false,
       });
+    }
     if (url.includes('/invitations/') && url.endsWith('/rsvp'))
       return response({
         invitationId: currentGuest.invitation?.id,
@@ -190,11 +212,77 @@ describe('host guest management screen', () => {
     expect(await screen.findByRole('heading', { name: 'Family Sample' })).toBeInTheDocument();
     expect(container.querySelector('article')).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getAllByText('Cannot receive automatic notifications').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('button', {
+        name: 'No contact · Manual delivery available · Automatic notifications unavailable',
+      }).length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText('People invited').previousSibling?.textContent).toBe('4');
   });
 
-  it('uses a confirmation before a destructive revoke action', async () => {
+  it('keeps private contact values out of the DOM until the host reveals them', async () => {
+    const contactGuest: HostGuest = {
+      ...guest,
+      email: 'private@example.test',
+      phone: '+1 214 555 0100',
+      preferredChannel: 'BOTH',
+      notificationEligibility: {
+        canNotifyAutomatically: true,
+        canEmail: true,
+        canSms: true,
+        reason: 'ELIGIBLE',
+      },
+    };
+
+    mockRequests(contactGuest);
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    expect(screen.queryByText('private@example.test')).not.toBeInTheDocument();
+    expect(screen.queryByText('+1 214 555 0100')).not.toBeInTheDocument();
+
+    const globalToggle = screen.getByRole('checkbox', {
+      name: 'Show private contact details',
+    });
+
+    await userEvent.click(globalToggle);
+
+    expect(screen.getAllByText('private@example.test').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('+1 214 555 0100').length).toBeGreaterThan(0);
+
+    await userEvent.click(globalToggle);
+
+    expect(screen.queryByText('private@example.test')).not.toBeInTheDocument();
+    expect(screen.queryByText('+1 214 555 0100')).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getAllByRole('button', {
+        name: 'Contact and delivery details',
+      })[0]!,
+    );
+
+    expect(screen.getAllByText('private@example.test')).toHaveLength(1);
+    expect(screen.getAllByText('+1 214 555 0100')).toHaveLength(1);
+  });
+
+  it('shows bulk actions after selecting a guest', async () => {
+    mockRequests();
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    await userEvent.click(
+      screen.getAllByRole('checkbox', {
+        name: 'Select Family Sample',
+      })[0]!,
+    );
+
+    expect(screen.getByRole('region', { name: 'Bulk actions' })).toBeInTheDocument();
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+  });
+
+  it('uses a themed confirmation before revoking an invitation', async () => {
     const invitedGuest: HostGuest = {
       ...guest,
       invitation: {
@@ -210,13 +298,139 @@ describe('host guest management screen', () => {
         revokedAt: null,
       },
     };
+
     const fetchMock = mockRequests(invitedGuest);
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
     await screen.findAllByRole('heading', { name: 'Family Sample' });
-    await userEvent.click(screen.getAllByRole('button', { name: 'Revoke' })[0]!);
-    expect(confirm).toHaveBeenCalledWith('Revoke this invitation? The link will stop working.');
+    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Revoke' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Revoke invitation',
+    });
+
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/revoke'))).toBe(false);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Revoke invitation' })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/revoke'))).toBe(false);
+  });
+
+  it('regenerates without resending email from the regeneration action', async () => {
+    const invitedGuest: HostGuest = {
+      ...guest,
+      email: 'guest@example.test',
+      preferredChannel: 'EMAIL',
+      notificationEligibility: {
+        canNotifyAutomatically: true,
+        canEmail: true,
+        canSms: false,
+        reason: 'ELIGIBLE',
+      },
+      invitation: {
+        id: '77777777-7777-4777-8777-777777777777',
+        status: 'READY',
+        locale: 'en-US',
+        tokenPrefix: 'abcdefgh',
+        firstOpenedAt: null,
+        lastOpenedAt: null,
+        openCount: 0,
+        createdAt: '2026-07-26T00:00:00.000Z',
+        updatedAt: '2026-07-26T00:00:00.000Z',
+        revokedAt: null,
+      },
+      emailDelivery: {
+        eligibility: {
+          eligible: true,
+          action: 'REGENERATE_AND_SEND',
+          reason: 'TOKEN_REGENERATION_REQUIRED',
+          requiresRegeneration: true,
+        },
+        lastAttempt: null,
+        retryAvailable: false,
+      },
+    };
+
+    const fetchMock = mockRequests(invitedGuest);
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findAllByRole('heading', { name: 'Family Sample' });
+    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Regenerate' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Regenerate invitation',
+    });
+    expect(
+      within(dialog).queryByRole('checkbox', {
+        name: 'Resend invitation email',
+      }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Regenerate' }));
+
+    const regenerateRequest = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/regenerate'),
+    );
+
+    expect(regenerateRequest).toBeDefined();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/email/send'))).toBe(false);
+  });
+
+  it('opens the guest editor from the explicit edit action', async () => {
+    mockRequests();
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
+
+    expect(screen.getByRole('dialog', { name: 'Save changes' })).toBeInTheDocument();
+  });
+
+  it('opens the editor and focuses invitation counts from the compact count', async () => {
+    mockRequests();
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    await userEvent.click(
+      screen.getAllByRole('button', {
+        name: /Edit invitation count: 4 invited/i,
+      })[0]!,
+    );
+
+    expect(await screen.findByRole('spinbutton', { name: 'Total invited' })).toHaveFocus();
+  });
+
+  it('updates invitation language inline after clicking its current value', async () => {
+    const fetchMock = mockRequests();
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    await userEvent.click(
+      screen.getAllByRole('button', {
+        name: /Change invitation language: English/i,
+      })[0]!,
+    );
+
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Change invitation language' }),
+      'es-MX',
+    );
+
+    const localeRequest = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).endsWith(`/internal/host/guests/${guest.id}`) && init?.method === 'PATCH',
+    );
+
+    expect(localeRequest).toBeDefined();
+    expect(JSON.parse(String(localeRequest?.[1]?.body))).toEqual({
+      locale: 'es-MX',
+    });
   });
 
   it('submits total-only guest creation without exposing a UUID in the visible route', async () => {
@@ -271,8 +485,16 @@ describe('host guest management screen', () => {
     mockRequests(invitedGuest);
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     await screen.findAllByRole('heading', { name: 'Family Sample' });
-    expect(screen.getAllByText('3 attending').length).toBeGreaterThan(0);
-    await userEvent.click(screen.getAllByRole('button', { name: 'RSVP details' })[0]!);
+    expect(screen.getAllByText('Accepted').length).toBeGreaterThan(0);
+    const unreadMessage = screen.getAllByRole('button', {
+      name: 'Unread guest message or request',
+    })[0]!;
+    await userEvent.click(unreadMessage);
+    expect(
+      screen.getAllByRole('button', {
+        name: 'Guest message and request details',
+      }).length,
+    ).toBeGreaterThan(0);
     expect(await screen.findByRole('dialog', { name: 'RSVP details' })).toBeInTheDocument();
     expect(screen.getByText(/No peanuts/)).toBeInTheDocument();
     expect(screen.getByText(/See you there/)).toBeInTheDocument();
@@ -282,45 +504,69 @@ describe('host guest management screen', () => {
     expect(screen.getAllByRole('heading', { name: 'Family Sample' }).length).toBeGreaterThan(0);
   });
 
-  it('unifies invitation, message, and email previews in one mobile-safe dialog', async () => {
+  it('opens invitation by default and switches previews from the compact menu', async () => {
     mockRequests();
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     await screen.findByRole('heading', { name: 'Family Sample' });
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
 
-    const dialog = await screen.findByRole('dialog', {
+    const invitationDialog = await screen.findByRole('dialog', {
       name: 'Invitation sharing preview',
     });
 
-    expect(dialog).toHaveClass('overflow-hidden');
-    expect(screen.getByRole('tab', { name: 'Social / Open Graph preview' })).toHaveAttribute(
+    expect(invitationDialog).toHaveClass('overflow-hidden');
+    expect(screen.getByRole('tab', { name: 'Preview invitation' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    expect(screen.getByText(/Approximation only/)).toBeInTheDocument();
-    expect(screen.getByText('SMS preview')).toBeInTheDocument();
-    expect(screen.getByText(/characters/)).toBeInTheDocument();
-    expect(screen.getByText('Calendar preview')).toBeInTheDocument();
-    expect(screen.getByText(/SMS delivery is unavailable/i)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Preview invitation' }));
-
     expect(await screen.findByTestId('unified-invitation-viewport')).toHaveAttribute(
       'data-viewport',
       'mobile',
     );
-    expect(screen.getByRole('button', { name: 'Open invitation' })).toBeVisible();
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Email preview' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Close preview' }));
 
-    expect(await screen.findByTitle('Email preview')).toHaveAttribute(
-      'srcdoc',
-      expect.stringContaining('Responsive invitation preview'),
+    await userEvent.click(screen.getAllByRole('button', { name: 'Preview options' })[0]!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Social / Open Graph preview' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Invitation sharing preview' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Social / Open Graph preview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
+    expect(screen.getByText('SMS preview')).toBeInTheDocument();
+    expect(screen.getByText('Calendar preview')).toBeInTheDocument();
   });
 
-  it('previews real email HTML and sends through the CSRF-protected route', async () => {
+  it('shows opening details only when opening timestamps exist', async () => {
+    const openedGuest: HostGuest = {
+      ...guest,
+      invitation: {
+        id: '77777777-7777-4777-8777-777777777777',
+        status: 'OPENED',
+        locale: 'en-US',
+        tokenPrefix: 'abcdefgh',
+        firstOpenedAt: '2026-07-27T00:00:00.000Z',
+        lastOpenedAt: '2026-07-27T00:00:00.000Z',
+        openCount: 1,
+        createdAt: '2026-07-26T00:00:00.000Z',
+        updatedAt: '2026-07-27T00:00:00.000Z',
+        revokedAt: null,
+      },
+    };
+
+    mockRequests(openedGuest);
+    render(<HostGuestPanel eventIdentifier="raymundo-6" />);
+
+    await screen.findByRole('heading', { name: 'Family Sample' });
+
+    expect(screen.getAllByLabelText('Total openings: 1').length).toBeGreaterThan(0);
+  });
+
+  it('previews real email HTML, sends, and shares the generated invitation', async () => {
     const emailGuest: HostGuest = {
       ...guest,
       email: 'guest@example.test',
@@ -343,17 +589,26 @@ describe('host guest management screen', () => {
       },
     };
     const originalClipboard = navigator.clipboard;
+    const originalShare = navigator.share;
     const writeText = vi.fn().mockResolvedValue(undefined);
+    const nativeShare = vi.fn().mockResolvedValue(undefined);
+
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
+    });
+
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: nativeShare,
     });
 
     const fetchMock = mockRequests(emailGuest);
     render(<HostGuestPanel eventIdentifier="raymundo-6" />);
     await screen.findByRole('heading', { name: 'Family Sample' });
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Preview email' })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Preview options' })[0]!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Email preview' }));
     expect(
       await screen.findByRole('dialog', { name: 'Invitation sharing preview' }),
     ).toBeInTheDocument();
@@ -367,7 +622,17 @@ describe('host guest management screen', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Close preview' }));
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Generate and send email' })[0]!);
+    const guestTable = screen.getByRole('table');
+    await userEvent.click(
+      within(guestTable).getByRole('button', {
+        name: /Email notification:/i,
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Send email',
+      }),
+    );
     const sendRequest = fetchMock.mock.calls.find(([url]) => String(url).includes('/email/send'));
     expect(sendRequest?.[1]).toMatchObject({
       method: 'POST',
@@ -378,13 +643,37 @@ describe('host guest management screen', () => {
       overridePreferredChannel: false,
     });
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
+    const shareButton = await within(screen.getByRole('table')).findByRole('button', {
+      name: 'Share invitation',
+    });
 
-    expect(writeText).toHaveBeenCalledWith('https://raymundo6th.domoforge.com/i/private-once');
+    await userEvent.click(shareButton);
+
+    expect(nativeShare).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://raymundo6th.domoforge.com/i/private-once',
+      }),
+    );
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Preview options' })[0]!);
+    await userEvent.click(
+      await screen.findByRole('menuitem', {
+        name: 'Social / Open Graph preview',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('https://raymundo6th.domoforge.com/i/private-once');
+    });
 
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: originalClipboard,
+    });
+
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: originalShare,
     });
   });
 });
