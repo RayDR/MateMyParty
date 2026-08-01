@@ -55,6 +55,55 @@ describe('/i/[token] content', () => {
     expect(screen.queryByRole('contentinfo', { name: 'RSVP' })).not.toBeInTheDocument();
   });
 
+  it('records an opening only after the explicit open action', () => {
+    mockAudioPlay();
+    const token = 'A'.repeat(43);
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ opened: true }));
+
+    render(
+      <PublicInvitation invitation={privateInvitation} initialLocale="en-US" accessToken={token} />,
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    openSummary();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/internal/invitation/open',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: expect.objectContaining({
+          'x-mmp-csrf': '1',
+          'x-invitation-token': token,
+        }),
+      }),
+    );
+  });
+
+  it('does not record an opening from the host preview', () => {
+    mockAudioPlay();
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ opened: true }));
+
+    render(
+      <PublicInvitation
+        invitation={privateInvitation}
+        initialLocale="en-US"
+        preview
+        accessToken={'A'.repeat(43)}
+      />,
+    );
+
+    openSummary();
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/internal/invitation/open', expect.anything());
+  });
+
   it('unlocks audio with the first gesture and reveals only the private summary', () => {
     const play = mockAudioPlay();
     render(<PublicInvitation invitation={privateInvitation} initialLocale="en-US" />);
@@ -63,7 +112,7 @@ describe('/i/[token] content', () => {
     expect(screen.getByText("You're invited")).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Family Sample' })).toBeVisible();
     expect(screen.getByText('We cannot wait to celebrate with you.')).toBeInTheDocument();
-    expect(screen.getByText('Please arrive ten minutes early.')).toBeInTheDocument();
+    expect(screen.queryByText('Please arrive ten minutes early.')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Raymundo’s 6th Birthday' }),
     ).not.toBeInTheDocument();
@@ -88,15 +137,28 @@ describe('/i/[token] content', () => {
     expect(screen.getByText('Family Sample')).toBeVisible();
     expect(screen.getByText('2 adults · 2 children')).toBeVisible();
     expect(screen.getByText(/1:00 PM/)).toBeVisible();
-    expect(screen.getByText(/123 Celebration Lane/)).toBeVisible();
+    expect(screen.getByTitle('Address')).toHaveAttribute(
+      'src',
+      expect.stringContaining('123%20Celebration%20Lane'),
+    );
     expect(screen.getByRole('timer')).toHaveAttribute('data-countdown-presentation', 'watermark');
     expect(screen.getByRole('link', { name: 'Directions' })).toHaveAttribute(
       'href',
       'https://maps.example.test/celebration',
     );
-    expect(screen.getByRole('link', { name: 'Google Maps' })).toHaveAttribute(
-      'href',
+    expect(screen.getByTitle('Address')).toHaveAttribute(
+      'src',
       expect.stringContaining('google.com/maps'),
+    );
+
+    expect(screen.getByRole('link', { name: 'Directions' })).toHaveAttribute(
+      'href',
+      'https://maps.example.test/celebration',
+    );
+
+    expect(screen.getByRole('link', { name: 'Apple Maps' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('maps.apple.com'),
     );
     expect(screen.getByRole('link', { name: 'Apple Maps' })).toHaveAttribute(
       'href',
@@ -104,9 +166,7 @@ describe('/i/[token] content', () => {
     );
     expect(screen.getByText('Arrival information').closest('details')).not.toHaveAttribute('open');
     expect(screen.getByText('Parking information').closest('details')).not.toHaveAttribute('open');
-    expect(screen.getByText('Message from the host').closest('details')).not.toHaveAttribute(
-      'open',
-    );
+    expect(screen.getByText('Message from the host').closest('details')).toHaveAttribute('open');
     expect(container.querySelector('.invitation-essential')?.closest('details')).toBeNull();
     expect(screen.getByRole('contentinfo', { name: 'RSVP' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Pause video + Pause theme audio' })).toHaveAttribute(

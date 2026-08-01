@@ -264,6 +264,9 @@ export const invitations = pgTable(
     publicTokenPrefix: text('public_token_prefix').notNull(),
     status: invitationStatus('status').notNull().default('READY'),
     locale: text('locale').notNull(),
+    firstVisitedAt: timestamp('first_visited_at', { withTimezone: true, mode: 'date' }),
+    lastVisitedAt: timestamp('last_visited_at', { withTimezone: true, mode: 'date' }),
+    visitCount: integer('visit_count').notNull().default(0),
     firstOpenedAt: timestamp('first_opened_at', { withTimezone: true, mode: 'date' }),
     lastOpenedAt: timestamp('last_opened_at', { withTimezone: true, mode: 'date' }),
     openCount: integer('open_count').notNull().default(0),
@@ -277,6 +280,7 @@ export const invitations = pgTable(
     uniqueIndex('invitations_one_active_per_guest_unique')
       .on(table.guestId)
       .where(sql`${table.revokedAt} is null`),
+    check('invitations_visit_count_non_negative', sql`${table.visitCount} >= 0`),
     check('invitations_open_count_non_negative', sql`${table.openCount} >= 0`),
     check(
       'invitations_revoked_state_check',

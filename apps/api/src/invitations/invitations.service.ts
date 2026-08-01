@@ -114,6 +114,21 @@ export class InvitationsService {
     });
   }
 
+  recordOpen(
+    permanentToken: string | undefined,
+    grantToken: string | undefined,
+    metadata: Record<string, string>,
+  ) {
+    return this.repository.transaction(async (executor) => {
+      const invitation = await this.resolveAccess(permanentToken, grantToken, executor);
+      const now = new Date();
+      const opened = await this.repository.recordOpen(invitation.id, now, executor);
+      if (!opened) throw this.publicNotFound();
+      await this.repository.addActivity(invitation.id, 'OPENED', metadata, executor);
+      return { opened: true as const };
+    });
+  }
+
   resolveAndTrack(token: string, metadata: Record<string, string>): Promise<PrivateInvitation> {
     if (!this.tokens.isValidFormat(token)) return Promise.reject(this.publicNotFound());
     return this.repository.transaction(async (executor) => {
@@ -125,7 +140,7 @@ export class InvitationsService {
       if (!invitation || invitation.revokedAt) throw this.publicNotFound();
       const details = await this.repository.publicDetails(invitation.id, executor);
       if (!details) throw this.publicNotFound();
-      return this.renderAndTrack(invitation, metadata, executor, details);
+      return this.renderAndTrackVisit(invitation, metadata, executor, details);
     });
   }
 
@@ -151,7 +166,7 @@ export class InvitationsService {
       }
       const details = await this.repository.publicDetails(candidate.invitation.id, executor);
       if (!details) throw this.publicNotFound();
-      return this.renderAndTrack(candidate.invitation, metadata, executor, details);
+      return this.renderAndTrackVisit(candidate.invitation, metadata, executor, details);
     });
   }
 
@@ -192,7 +207,7 @@ export class InvitationsService {
     throw this.publicNotFound();
   }
 
-  private async renderAndTrack(
+  private async renderAndTrackVisit(
     invitation: Awaited<ReturnType<InvitationsRepository['findById']>> & object,
     metadata: Record<string, string>,
     executor: DatabaseExecutor,
@@ -203,9 +218,8 @@ export class InvitationsService {
       resolvedDetails ?? (await this.repository.publicDetails(invitation.id, executor));
     if (!details) throw this.publicNotFound();
     const now = new Date();
-    const opened = await this.repository.recordOpen(invitation.id, now, executor);
-    if (!opened) throw this.publicNotFound();
-    await this.repository.addActivity(invitation.id, 'OPENED', metadata, executor);
+    const visited = await this.repository.recordVisit(invitation.id, now, executor);
+    if (!visited) throw this.publicNotFound();
     return presentPrivateInvitation(
       {
         event: details.event,
@@ -213,7 +227,7 @@ export class InvitationsService {
         primaryHostname: details.primaryHostname,
       },
       details.guest,
-      opened.locale === 'es-MX' ? 'es-MX' : 'en-US',
+      visited.locale === 'es-MX' ? 'es-MX' : 'en-US',
       openedPreviously,
       details.rsvp ? this.presentRsvp(details.rsvp) : null,
       true,

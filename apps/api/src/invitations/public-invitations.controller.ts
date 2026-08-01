@@ -15,6 +15,15 @@ export class PublicInvitationsController {
     return this.lookupService.lookup(body, request.ip);
   }
 
+  @Post('open')
+  open(
+    @Headers('x-invitation-token') permanentToken?: string,
+    @Headers('x-invitation-grant') grantToken?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.invitations.recordOpen(permanentToken, grantToken, this.metadata(userAgent));
+  }
+
   @Get('access')
   access(
     @Headers('x-invitation-grant') grantToken?: string,

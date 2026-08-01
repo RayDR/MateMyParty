@@ -54,6 +54,7 @@ export function PublicInvitation({
   const [calendar, setCalendar] = useState<CalendarEvent>(invitation.tools.calendar);
   const media = useRef<InvitationMediaHandle>(null);
   const summary = useRef<HTMLElement>(null);
+  const openingTracked = useRef(false);
   const dictionary = getDictionary(locale);
   const { event } = invitation;
   const content = event.localizedContent[locale];
@@ -70,10 +71,6 @@ export function PublicInvitation({
     content.parkingInstructions,
     fallbackContent.parkingInstructions,
   );
-  const summaryInstructions = arrivalInstructions ?? parkingInstructions;
-  const summaryInstructionsTitle = arrivalInstructions
-    ? dictionary.invitation.arrivalInstructions
-    : dictionary.invitation.parkingInstructions;
   const startsAt = new Date(event.startsAt);
   const dateTime = new Intl.DateTimeFormat(locale, {
     dateStyle: 'full',
@@ -130,6 +127,32 @@ export function PublicInvitation({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [phase, reducedMotion]);
+
+  function revealInvitation() {
+    if (!preview && !openingTracked.current) {
+      openingTracked.current = true;
+
+      void fetch('/internal/invitation/open', {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: {
+          'x-mmp-csrf': '1',
+          ...(accessToken ? { 'x-invitation-token': accessToken } : {}),
+        },
+      }).catch(() => {
+        /*
+         * Tracking must never prevent the guest from opening the
+         * invitation or unlocking its media.
+         */
+      });
+    }
+
+    void media.current?.unlockAudio();
+    setPhase('summary');
+  }
+
   return (
     <ThemedInvitationStage
       ref={media}
@@ -191,10 +214,7 @@ export function PublicInvitation({
                       type="button"
                       title={dictionary.invitation.openInvitation}
                       aria-label={dictionary.invitation.openInvitation}
-                      onClick={() => {
-                        void media.current?.unlockAudio();
-                        setPhase('summary');
-                      }}
+                      onClick={revealInvitation}
                       className="invitation-envelope-button relative flex size-16 items-center justify-center rounded-full border border-amber-200/60 bg-slate-950/45 text-amber-200 shadow-xl backdrop-blur-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
                     >
                       <Mail aria-hidden size={28} className="invitation-envelope-closed absolute" />
@@ -243,17 +263,8 @@ export function PublicInvitation({
                 {hostMessage ? (
                   <RichText
                     value={hostMessage}
-                    className="rich-text invitation-summary-copy mx-auto mt-4 max-w-xl text-slate-200"
+                    className="rich-text mx-auto mt-4 max-w-xl text-slate-200"
                   />
-                ) : null}
-                {summaryInstructions ? (
-                  <div className="mx-auto mt-4 max-w-xl border-t border-white/10 pt-4">
-                    <h3 className="text-sm font-black text-cyan-100">{summaryInstructionsTitle}</h3>
-                    <RichText
-                      value={summaryInstructions}
-                      className="rich-text invitation-summary-copy mt-1 text-slate-300"
-                    />
-                  </div>
                 ) : null}
                 <button
                   type="button"
@@ -291,6 +302,11 @@ export function PublicInvitation({
                 dictionary={dictionary}
                 presentation="watermark"
               />
+              {hostMessage ? (
+                <Collapsible title={dictionary.invitation.hostMessageTitle} defaultOpen>
+                  <RichText value={hostMessage} />
+                </Collapsible>
+              ) : null}
               <section
                 aria-label={dictionary.invitation.eventDetails}
                 className="invitation-essential relative z-10 rounded-3xl border border-white/10 bg-slate-950/62 p-4 @md:p-6"
@@ -318,13 +334,14 @@ export function PublicInvitation({
                   <p className="mt-2 text-xl font-black text-white">
                     {venueName ?? dictionary.event.datePending}
                   </p>
-                  {address ? (
-                    <p className="mx-auto mt-1 max-w-xl text-slate-200">{address}</p>
-                  ) : null}
                   {invitation.tools.maps ? (
-                    <div className="mt-4 flex justify-center">
-                      <MapActions maps={invitation.tools.maps} dictionary={dictionary} />
-                    </div>
+                    <EmbeddedMap
+                      maps={invitation.tools.maps}
+                      address={address}
+                      dictionary={dictionary}
+                    />
+                  ) : address ? (
+                    <p className="mx-auto mt-2 max-w-xl text-slate-200">{address}</p>
                   ) : null}
                 </div>
                 <div className="my-5 h-px bg-white/10" />
@@ -342,11 +359,6 @@ export function PublicInvitation({
               {parkingInstructions ? (
                 <Collapsible title={dictionary.invitation.parkingInstructions}>
                   <RichText value={parkingInstructions} />
-                </Collapsible>
-              ) : null}
-              {hostMessage ? (
-                <Collapsible title={dictionary.invitation.hostMessageTitle}>
-                  <RichText value={hostMessage} />
                 </Collapsible>
               ) : null}
             </div>
@@ -915,7 +927,13 @@ function CalendarActions({
       >
         <CalendarPlus aria-hidden size={19} />
       </summary>
-      <div className="absolute top-full right-0 z-50 mt-2 grid w-[min(18rem,calc(100dvw-2rem))] max-w-[calc(100dvw-2rem)] gap-2 overflow-hidden rounded-2xl border border-white/15 bg-slate-950 p-3 shadow-2xl">
+      <div
+        className={`z-[60] grid w-[min(18rem,calc(100dvw-1.5rem))] max-w-[calc(100dvw-1.5rem)] gap-2 overflow-hidden rounded-2xl border border-white/15 bg-slate-950 p-3 shadow-2xl ${
+          preview
+            ? 'absolute top-full right-0 mt-2'
+            : 'fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] mx-auto'
+        }`}
+      >
         <ExternalAction
           href={calendar.googleCalendarUrl}
           label={dictionary.invitation.googleCalendar}
@@ -977,6 +995,66 @@ function ExternalAction({
       {icon === 'calendar' ? <CalendarPlus aria-hidden size={18} /> : null}
       {label}
     </a>
+  );
+}
+
+function EmbeddedMap({
+  maps,
+  address,
+  dictionary,
+}: {
+  maps: PrivateInvitationData['tools']['maps'] & object;
+  address: string;
+  dictionary: Dictionary;
+}) {
+  const mapAddress = maps.formattedAddress ?? address;
+  const embedUrl = mapAddress
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapAddress)}&output=embed`
+    : null;
+  const primaryUrl = maps.configuredMapsUrl ?? maps.googleMapsUrl ?? maps.appleMapsUrl;
+
+  if (!embedUrl && !primaryUrl) return null;
+
+  return (
+    <div className="mt-4">
+      {embedUrl ? (
+        <div className="overflow-hidden rounded-2xl border border-white/15 bg-slate-900">
+          <iframe
+            title={dictionary.invitation.address}
+            src={embedUrl}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="aspect-[4/3] w-full border-0 @md:aspect-video"
+          />
+        </div>
+      ) : null}
+      <div className="mt-3 flex justify-center gap-2">
+        {primaryUrl ? (
+          <a
+            href={primaryUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={dictionary.invitation.directions}
+            aria-label={dictionary.invitation.directions}
+            className="inline-flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/10"
+          >
+            <MapPin aria-hidden size={19} />
+          </a>
+        ) : null}
+        {maps.appleMapsUrl && maps.appleMapsUrl !== primaryUrl ? (
+          <a
+            href={maps.appleMapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={dictionary.invitation.appleMaps}
+            aria-label={dictionary.invitation.appleMaps}
+            className="inline-flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/10"
+          >
+            <MapPin aria-hidden size={19} />
+          </a>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
