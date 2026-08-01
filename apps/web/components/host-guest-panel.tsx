@@ -1004,7 +1004,7 @@ export function HostGuestPanel({ eventIdentifier }: { eventIdentifier: string })
           </div>
         ) : (
           <>
-            <div className="grid gap-4 lg:hidden">
+            <div className="grid gap-4 xl:hidden">
               {filtered.map((guest) => (
                 <GuestCard
                   key={guest.id}
@@ -1567,31 +1567,53 @@ type GuestActionProps = {
   onEmailPreview: () => void;
   onLocaleChange: (locale: Locale) => Promise<void>;
   emailBusy: boolean;
+  compact?: boolean;
 };
 
 function GuestActions(props: GuestActionProps) {
   const { guest, dictionary } = props;
+  const compact = Boolean(props.compact);
+
+  const containerClass = compact
+    ? 'inline-flex shrink-0 flex-nowrap items-center gap-0.5 rounded-xl border border-white/10 bg-slate-950/40 p-0.5'
+    : 'inline-flex max-w-full flex-nowrap items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/40 p-1';
 
   if (guest.archivedAt) {
     return (
-      <div className="inline-flex rounded-2xl border border-white/10 bg-slate-950/40 p-1">
-        <IconAction icon={RotateCcw} onClick={props.onRestore} label={dictionary.host.restore} />
+      <div className={containerClass}>
+        <IconAction
+          compact={compact}
+          icon={RotateCcw}
+          onClick={props.onRestore}
+          label={dictionary.host.restore}
+        />
       </div>
     );
   }
 
   return (
-    <div className="inline-flex max-w-full flex-nowrap items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/40 p-1">
-      <IconAction icon={Pencil} onClick={props.onEdit} label={dictionary.host.edit} />
+    <div className={containerClass}>
+      <IconAction
+        compact={compact}
+        icon={Pencil}
+        onClick={props.onEdit}
+        label={dictionary.host.edit}
+      />
       <PreviewSplitButton
+        compact={compact}
         dictionary={dictionary}
         onInvitation={props.onPreview}
         onEmail={props.onEmailPreview}
         onSocial={props.onSocialPreview}
       />
-      <span className="mx-0.5 h-7 w-px bg-white/10" />
-      <IconAction icon={Share2} onClick={props.onShare} label={dictionary.host.shareInvitation} />
-      <MoreActionsMenu {...props} />
+      <span className={compact ? 'mx-0.5 h-6 w-px bg-white/10' : 'mx-0.5 h-7 w-px bg-white/10'} />
+      <IconAction
+        compact={compact}
+        icon={Share2}
+        onClick={props.onShare}
+        label={dictionary.host.shareInvitation}
+      />
+      <MoreActionsMenu {...props} compact={compact} />
     </div>
   );
 }
@@ -1601,11 +1623,13 @@ function PreviewSplitButton({
   onInvitation,
   onEmail,
   onSocial,
+  compact = false,
 }: {
   dictionary: Dictionary;
   onInvitation: () => void;
   onEmail: () => void;
   onSocial: () => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -1613,6 +1637,14 @@ function PreviewSplitButton({
     setOpen(false);
     action();
   }
+
+  const invitationButtonClass = compact
+    ? 'flex size-8 items-center justify-center rounded-l-lg bg-slate-700 text-slate-100 transition hover:bg-slate-600'
+    : 'flex size-10 items-center justify-center rounded-l-xl bg-slate-700 text-slate-100 transition hover:bg-slate-600';
+
+  const optionsButtonClass = compact
+    ? 'flex h-8 w-6 items-center justify-center rounded-r-lg border-l border-white/10 bg-slate-700 text-slate-200 transition hover:bg-slate-600'
+    : 'flex h-10 w-7 items-center justify-center rounded-r-xl border-l border-white/10 bg-slate-700 text-slate-200 transition hover:bg-slate-600';
 
   return (
     <div
@@ -1631,9 +1663,9 @@ function PreviewSplitButton({
           event.stopPropagation();
           onInvitation();
         }}
-        className="flex size-10 items-center justify-center rounded-l-xl bg-slate-700 text-slate-100 transition hover:bg-slate-600"
+        className={invitationButtonClass}
       >
-        <Eye aria-hidden size={18} />
+        <Eye aria-hidden size={compact ? 16 : 18} />
       </button>
 
       <button
@@ -1646,9 +1678,9 @@ function PreviewSplitButton({
           event.stopPropagation();
           setOpen((current) => !current);
         }}
-        className="flex h-10 w-7 items-center justify-center rounded-r-xl border-l border-white/10 bg-slate-700 text-slate-200 transition hover:bg-slate-600"
+        className={optionsButtonClass}
       >
-        <ChevronDown aria-hidden size={15} />
+        <ChevronDown aria-hidden size={compact ? 13 : 15} />
       </button>
 
       {open ? (
@@ -1680,7 +1712,9 @@ function PreviewSplitButton({
 function MoreActionsMenu(props: GuestActionProps) {
   const [open, setOpen] = useState(false);
   const { guest, dictionary } = props;
+  const compact = Boolean(props.compact);
   const activeInvitation = Boolean(guest.invitation && !guest.invitation.revokedAt);
+
   function select(action: () => void) {
     setOpen(false);
     action();
@@ -1705,9 +1739,13 @@ function MoreActionsMenu(props: GuestActionProps) {
           event.stopPropagation();
           setOpen((current) => !current);
         }}
-        className="flex size-10 items-center justify-center rounded-xl bg-slate-700 text-slate-100 transition hover:bg-slate-600"
+        className={
+          compact
+            ? 'flex size-8 items-center justify-center rounded-lg bg-slate-700 text-slate-100 transition hover:bg-slate-600'
+            : 'flex size-10 items-center justify-center rounded-xl bg-slate-700 text-slate-100 transition hover:bg-slate-600'
+        }
       >
-        <MoreHorizontal aria-hidden size={19} />
+        <MoreHorizontal aria-hidden size={compact ? 17 : 19} />
       </button>
 
       {open ? (
@@ -1811,32 +1849,49 @@ function GuestCard(
   const { guest, dictionary, locale } = props;
 
   return (
-    <article className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-xl">
-      <div className="flex items-start gap-3">
+    <article className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-xl">
+      <div className="flex items-start gap-2.5">
         <input
           type="checkbox"
           checked={props.selected}
           onChange={props.onSelect}
           aria-label={dictionary.host.selectGuest.replace('{guest}', guest.displayName)}
-          className="mt-1 size-4 shrink-0 accent-cyan-500"
+          className="mt-2 size-4 shrink-0 accent-cyan-500"
         />
+
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xl font-bold">{guest.displayName}</h2>
-          <div className="mt-1">
+          <h2 className="truncate text-base font-bold leading-6 text-white">{guest.displayName}</h2>
+          <div className="-ml-1 mt-0.5">
             <InlineLocaleEditor
               guest={guest}
               dictionary={dictionary}
               onChange={props.onLocaleChange}
             />
           </div>
-          <div className="mt-2">
-            <GuestCountSummary guest={guest} dictionary={dictionary} onEdit={props.onEditCounts} />
-          </div>
         </div>
+
+        <GuestActions {...props} compact />
       </div>
 
-      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+        <GuestCountSummary
+          compact
+          guest={guest}
+          dictionary={dictionary}
+          onEdit={props.onEditCounts}
+        />
+
+        <InvitationActivitySummary
+          compact
+          guest={guest}
+          dictionary={dictionary}
+          locale={locale}
+          messageUnread={props.rsvpUnread}
+          onOpenMessage={props.onOpenGuestMessage}
+        />
+
         <ContactDeliverySummary
+          compact
           guest={guest}
           dictionary={dictionary}
           locale={locale}
@@ -1844,17 +1899,6 @@ function GuestCard(
           emailBusy={props.emailBusy}
           onNotify={props.onNotify}
         />
-        <InvitationActivitySummary
-          guest={guest}
-          dictionary={dictionary}
-          locale={locale}
-          messageUnread={props.rsvpUnread}
-          onOpenMessage={props.onOpenGuestMessage}
-        />
-      </div>
-
-      <div className="mt-5 border-t border-white/10 pt-4">
-        <GuestActions {...props} />
       </div>
     </article>
   );
@@ -1902,7 +1946,7 @@ function GuestTable({
   emailBusy: string | null;
 }) {
   return (
-    <div className="hidden max-h-[70vh] overflow-auto rounded-3xl border border-white/10 bg-slate-900/80 lg:block">
+    <div className="hidden max-h-[70vh] overflow-auto rounded-3xl border border-white/10 bg-slate-900/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:block">
       <table className="w-full min-w-[980px] table-fixed text-left text-sm">
         <thead className="sticky top-0 z-20 bg-slate-900/95 text-xs uppercase tracking-wide text-slate-300 backdrop-blur">
           <tr>
@@ -2018,10 +2062,12 @@ function GuestCountSummary({
   guest,
   dictionary,
   onEdit,
+  compact = false,
 }: {
   guest: HostGuest;
   dictionary: Dictionary;
   onEdit: () => void;
+  compact?: boolean;
 }) {
   const totalLabel = dictionary.host.peopleInvitedShort.replace(
     '{count}',
@@ -2040,28 +2086,34 @@ function GuestCountSummary({
       ? `${totalLabel}: ${adultsLabel}, ${childrenLabel}`
       : totalLabel;
 
+  const buttonClass = compact
+    ? 'inline-flex max-w-full items-center gap-2 rounded-lg px-1 py-1 text-xs font-bold text-slate-200 transition hover:bg-cyan-500/10 hover:text-cyan-100'
+    : 'inline-flex max-w-full items-center gap-2 rounded-xl border border-white/10 bg-slate-950/45 px-2.5 py-2 text-xs font-bold text-slate-200 transition hover:border-cyan-400/40 hover:bg-cyan-500/10';
+
+  const iconSize = compact ? 14 : 16;
+
   return (
     <button
       type="button"
       title={summary}
       aria-label={`${dictionary.host.editInvitationCount}: ${summary}`}
       onClick={onEdit}
-      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-white/10 bg-slate-950/45 px-2.5 py-2 text-xs font-bold text-slate-200 transition hover:border-cyan-400/40 hover:bg-cyan-500/10"
+      className={buttonClass}
     >
       {guest.invitationCountMode === 'ADULTS_AND_CHILDREN' ? (
         <>
           <span className="inline-flex items-center gap-1" title={adultsLabel}>
-            <UserRound aria-hidden size={16} />
+            <UserRound aria-hidden size={iconSize} />
             {guest.adultsInvited ?? 0}
           </span>
           <span className="inline-flex items-center gap-1" title={childrenLabel}>
-            <Baby aria-hidden size={16} />
+            <Baby aria-hidden size={iconSize} />
             {guest.childrenInvited ?? 0}
           </span>
         </>
       ) : (
         <span className="inline-flex items-center gap-1" title={totalLabel}>
-          <UsersRound aria-hidden size={16} />
+          <UsersRound aria-hidden size={iconSize} />
           {guest.totalInvited}
         </span>
       )}
@@ -2076,6 +2128,7 @@ function ContactDeliverySummary({
   showAll,
   emailBusy,
   onNotify,
+  compact = false,
 }: {
   guest: HostGuest;
   dictionary: Dictionary;
@@ -2083,6 +2136,7 @@ function ContactDeliverySummary({
   showAll: boolean;
   emailBusy: boolean;
   onNotify: (channel: NotificationChannel) => void;
+  compact?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const revealDetails = showAll || expanded;
@@ -2094,18 +2148,19 @@ function ContactDeliverySummary({
   const attempt = guest.emailDelivery?.lastAttempt;
   const emailSent = attempt?.status === 'SENT' || attempt?.status === 'DELIVERED';
   const emailFailed = attempt?.status === 'FAILED';
-  const attemptTime = attempt
-    ? (attempt.deliveredAt ??
-      attempt.sentAt ??
-      attempt.failedAt ??
-      attempt.updatedAt ??
-      attempt.createdAt)
+  const lastSentAt = emailSent
+    ? (attempt?.deliveredAt ?? attempt?.sentAt ?? attempt?.updatedAt ?? attempt?.createdAt ?? null)
     : null;
-  const failedDetail = emailFailed ? (attempt?.safeErrorMessage ?? attempt?.safeErrorCode) : null;
 
   return (
-    <div className="max-w-56 text-xs">
-      <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/45 p-1">
+    <div className={compact ? 'min-w-0 text-xs' : 'max-w-56 text-xs'}>
+      <div
+        className={
+          compact
+            ? 'inline-flex items-center gap-1'
+            : 'inline-flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/45 p-1'
+        }
+      >
         <ContactChannelButton
           icon={Mail}
           label={dictionary.host.emailNotification}
@@ -2125,6 +2180,7 @@ function ContactDeliverySummary({
           busy={emailBusy}
           onClick={() => onNotify('EMAIL')}
         />
+
         <ContactChannelButton
           icon={Phone}
           label={dictionary.host.smsNotification}
@@ -2172,45 +2228,71 @@ function ContactDeliverySummary({
       </div>
 
       {revealDetails ? (
-        <div className="mt-2 space-y-2 rounded-xl border border-white/10 bg-slate-950/70 p-3 leading-5 text-slate-300">
+        <div
+          className={
+            compact
+              ? 'mt-2 min-w-52 max-w-[calc(100vw-3rem)] space-y-2 rounded-lg border border-white/10 bg-slate-950/80 p-2.5 leading-5 text-slate-300'
+              : 'mt-2 space-y-2 rounded-xl border border-white/10 bg-slate-950/60 p-3 leading-5 text-slate-300'
+          }
+        >
           {!hasContact ? (
             <p className="text-amber-100">{dictionary.host.noContactDeliveryNotice}</p>
           ) : null}
+
           {guest.email ? (
-            <p className="flex items-start gap-2">
+            <div className="flex items-start gap-2">
               <Mail aria-hidden size={15} className="mt-0.5 shrink-0 text-cyan-300" />
-              <span className="break-all">{guest.email}</span>
-            </p>
+
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-start gap-1.5">
+                  <span className="break-all">{guest.email}</span>
+
+                  {emailPreferred ? (
+                    <PreferredChannelMarker label={dictionary.host.preferredContactChannel} />
+                  ) : null}
+                </div>
+
+                {lastSentAt ? (
+                  <p className="mt-0.5 text-[11px] italic leading-4 text-slate-500">
+                    {dictionary.host.lastSentAt.replace(
+                      '{date}',
+                      formatDate(lastSentAt, locale, dictionary.host.never),
+                    )}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           ) : null}
+
           {guest.phone ? (
-            <p className="flex items-start gap-2">
+            <div className="flex items-start gap-2">
               <Phone aria-hidden size={15} className="mt-0.5 shrink-0 text-cyan-300" />
-              <span className="break-all">{guest.phone}</span>
-            </p>
-          ) : null}
-          <p>
-            {dictionary.host.preferredChannel}:{' '}
-            <strong>{channelLabel(guest.preferredChannel, dictionary)}</strong>
-          </p>
-          {attempt ? (
-            <>
-              <p>
-                {dictionary.host.lastEmailStatus}: <strong>{attempt.status}</strong>
-              </p>
-              <p>
-                {dictionary.host.lastEmailTime}:{' '}
-                {formatDate(attemptTime, locale, dictionary.host.never)}
-              </p>
-              {failedDetail ? (
-                <p className="rounded-lg bg-red-500/10 px-2 py-1 text-red-200">{failedDetail}</p>
-              ) : null}
-            </>
-          ) : hasEmail ? (
-            <p>{dictionary.host.emailNotSentShort}</p>
+
+              <div className="flex min-w-0 items-start gap-1.5">
+                <span className="break-all">{guest.phone}</span>
+
+                {phonePreferred ? (
+                  <PreferredChannelMarker label={dictionary.host.preferredContactChannel} />
+                ) : null}
+              </div>
+            </div>
           ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+function PreferredChannelMarker({ label }: { label: string }) {
+  return (
+    <span
+      role="img"
+      title={label}
+      aria-label={label}
+      className="mt-1 inline-flex size-3 shrink-0 items-center justify-center"
+    >
+      <span aria-hidden className="size-1.5 rounded-full bg-cyan-300" />
+    </span>
   );
 }
 
@@ -2408,12 +2490,14 @@ function InvitationActivitySummary({
   locale,
   messageUnread,
   onOpenMessage,
+  compact = false,
 }: {
   guest: HostGuest;
   dictionary: Dictionary;
   locale: Locale;
   messageUnread: boolean;
   onOpenMessage: () => void;
+  compact?: boolean;
 }) {
   const invitation = guest.invitation;
   const response = invitation?.rsvp;
@@ -2436,23 +2520,25 @@ function InvitationActivitySummary({
         .join(' · ')
     : openingLabel;
 
+  const openingClass = compact
+    ? 'inline-flex items-center gap-1 rounded-lg px-1 py-1 text-xs font-bold text-slate-300'
+    : `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${
+        invitation && invitation.openCount > 0
+          ? 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100'
+          : 'border-white/10 bg-white/5 text-slate-300'
+      }`;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <StatusBadge guest={guest} dictionary={dictionary} />
+      <StatusBadge compact={compact} guest={guest} dictionary={dictionary} />
+
       {invitation ? (
-        <span
-          title={openingDetails}
-          aria-label={openingLabel}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${
-            invitation.openCount > 0
-              ? 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100'
-              : 'border-white/10 bg-white/5 text-slate-300'
-          }`}
-        >
+        <span title={openingDetails} aria-label={openingLabel} className={openingClass}>
           <Eye aria-hidden size={14} />
           {invitation.openCount}
         </span>
       ) : null}
+
       {hasMessage ? (
         <button
           type="button"
@@ -2463,13 +2549,13 @@ function InvitationActivitySummary({
             messageUnread ? dictionary.host.unreadGuestMessage : dictionary.host.guestMessageDetails
           }
           onClick={onOpenMessage}
-          className={`relative flex size-8 items-center justify-center rounded-xl border border-white/10 bg-slate-800 text-slate-200 hover:bg-slate-700 ${
-            messageUnread ? 'animate-pulse ring-2 ring-amber-300/60' : ''
-          }`}
+          className={`relative flex items-center justify-center border border-white/10 bg-slate-800 text-slate-200 hover:bg-slate-700 ${
+            compact ? 'size-7 rounded-lg' : 'size-8 rounded-xl'
+          } ${messageUnread ? 'animate-pulse ring-2 ring-amber-300/60' : ''}`}
         >
-          <MessageSquare aria-hidden size={16} />
+          <MessageSquare aria-hidden size={compact ? 14 : 16} />
           {messageUnread ? (
-            <span className="absolute right-1 top-1 size-2 rounded-full bg-amber-300" />
+            <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-amber-300" />
           ) : null}
         </button>
       ) : null}
@@ -2477,35 +2563,64 @@ function InvitationActivitySummary({
   );
 }
 
-function StatusBadge({ guest, dictionary }: { guest: HostGuest; dictionary: Dictionary }) {
+function StatusBadge({
+  guest,
+  dictionary,
+  compact = false,
+}: {
+  guest: HostGuest;
+  dictionary: Dictionary;
+  compact?: boolean;
+}) {
   const response = guest.invitation?.rsvp;
   let label = dictionary.host.invitationNotCreated;
   let style = 'bg-slate-700 text-slate-200';
+  let dotStyle = 'bg-slate-500';
 
   if (guest.archivedAt) {
     label = dictionary.host.guestArchived;
     style = 'bg-slate-600 text-slate-100';
+    dotStyle = 'bg-slate-400';
   } else if (guest.invitation?.revokedAt) {
     label = dictionary.host.invitationRevoked;
     style = 'bg-slate-700 text-slate-200';
+    dotStyle = 'bg-slate-500';
   } else if (response?.status === 'ACCEPTED') {
     label = dictionary.host.rsvpAccepted;
     style = 'bg-emerald-500/20 text-emerald-100';
+    dotStyle = 'bg-emerald-400';
   } else if (response?.status === 'DECLINED') {
     label = dictionary.host.rsvpDeclined;
     style = 'bg-red-500/20 text-red-100';
+    dotStyle = 'bg-red-400';
   } else if (response?.status === 'NOT_SURE') {
     label = dictionary.host.rsvpNotSure;
     style = 'bg-cyan-500/20 text-cyan-100';
+    dotStyle = 'bg-cyan-400';
   } else if (response?.status === 'CANCELLED') {
     label = dictionary.host.rsvpCancelled;
     style = 'bg-slate-600 text-slate-100';
+    dotStyle = 'bg-slate-400';
   } else if ((guest.invitation?.openCount ?? 0) > 0) {
     label = dictionary.host.invitationOpened;
     style = 'bg-cyan-500/20 text-cyan-100';
+    dotStyle = 'bg-cyan-400';
   } else if (guest.invitation) {
     label = dictionary.host.invitationReady;
     style = 'bg-emerald-500/20 text-emerald-100';
+    dotStyle = 'bg-emerald-400';
+  }
+
+  if (compact) {
+    return (
+      <span
+        title={label}
+        className="inline-flex items-center gap-1.5 whitespace-nowrap px-1 py-1 text-xs font-bold text-slate-200"
+      >
+        <span aria-hidden className={`size-2 rounded-full ${dotStyle}`} />
+        {label}
+      </span>
+    );
   }
 
   return (
@@ -2524,48 +2639,76 @@ function GuestEditSummary({
 }) {
   const response = guest.invitation?.rsvp;
   const attempt = guest.emailDelivery?.lastAttempt;
+  const lastEmailActivityAt = attempt
+    ? (attempt.deliveredAt ??
+      attempt.sentAt ??
+      attempt.failedAt ??
+      attempt.updatedAt ??
+      attempt.createdAt)
+    : null;
+  const contacts = [guest.email, guest.phone].filter((value): value is string => Boolean(value));
 
   return (
     <div className="m-4 mb-0 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
       <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
         {dictionary.host.editingGuest}
       </p>
+
       <h2 className="mt-1 text-2xl font-black">{guest.displayName}</h2>
-      <p className="mt-1 text-xs text-slate-400">
-        {dictionary.host.originalGuestName}: {guest.displayName}
-      </p>
 
       <details className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 p-3">
         <summary className="cursor-pointer font-bold text-slate-100">
           {dictionary.host.guestStatusSummary}
         </summary>
+
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-slate-400">{dictionary.host.status}</dt>
             <dd className="mt-1 font-semibold">{guestStatusText(guest, dictionary)}</dd>
           </div>
+
           <div>
             <dt className="text-xs text-slate-400">{dictionary.host.openCount}</dt>
             <dd className="mt-1 font-semibold">{guest.invitation?.openCount ?? 0}</dd>
           </div>
+
+          <div>
+            <dt className="text-xs text-slate-400">{dictionary.host.contacts}</dt>
+            <dd className="mt-1 break-words font-semibold">
+              {contacts.length ? contacts.join(' · ') : dictionary.host.notAvailable}
+            </dd>
+          </div>
+
           <div>
             <dt className="text-xs text-slate-400">{dictionary.host.preferredChannel}</dt>
             <dd className="mt-1 font-semibold">
               {channelLabel(guest.preferredChannel, dictionary)}
             </dd>
           </div>
+
           <div>
             <dt className="text-xs text-slate-400">{dictionary.host.lastEmailStatus}</dt>
             <dd className="mt-1 font-semibold">
               {attempt?.status ?? dictionary.host.emailNotSentShort}
             </dd>
           </div>
+
+          <div>
+            <dt className="text-xs text-slate-400">{dictionary.host.lastEmailTime}</dt>
+            <dd className="mt-1 font-semibold">
+              {lastEmailActivityAt
+                ? formatDate(lastEmailActivityAt, locale, dictionary.host.never)
+                : dictionary.host.never}
+            </dd>
+          </div>
+
           <div>
             <dt className="text-xs text-slate-400">{dictionary.host.rsvpCurrent}</dt>
             <dd className="mt-1 font-semibold">
               {response ? hostRsvpStatus(response.status, dictionary) : dictionary.host.rsvpPending}
             </dd>
           </div>
+
           <div>
             <dt className="text-xs text-slate-400">{dictionary.host.rsvpLastResponse}</dt>
             <dd className="mt-1 font-semibold">
@@ -2688,6 +2831,7 @@ function IconAction({
   warning,
   danger,
   disabled,
+  compact = false,
 }: {
   icon: LucideIcon;
   label: string;
@@ -2696,6 +2840,7 @@ function IconAction({
   warning?: boolean;
   danger?: boolean;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const color = danger
     ? 'bg-red-800 text-red-50 hover:bg-red-700'
@@ -2716,9 +2861,15 @@ function IconAction({
           event.stopPropagation();
           onClick();
         }}
-        className={`relative flex size-10 items-center justify-center rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${color}`}
+        className={`relative flex items-center justify-center transition disabled:cursor-wait disabled:opacity-60 ${
+          compact ? 'size-8 rounded-lg' : 'size-10 rounded-xl'
+        } ${color}`}
       >
-        <Icon aria-hidden size={18} className={disabled ? 'animate-spin' : undefined} />
+        <Icon
+          aria-hidden
+          size={compact ? 16 : 18}
+          className={disabled ? 'animate-spin' : undefined}
+        />
       </button>
       <span
         role="tooltip"
