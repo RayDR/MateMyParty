@@ -338,6 +338,6 @@
   "bulkRegenerateTitle": "Regenerate selected invitations?",
   "bulkActionDescription": "{eligible} of {selected} selected guests are eligible for this action. Ineligible guests will be skipped.",
   "editingGuest": "Editing guest",
-  "originalGuestName": "Original guest name",
-  "guestStatusSummary": "Guest and invitation status summary"
+  "guestStatusSummary": "Overview",
+  "lastSentAt": "Last sent: {date}"
 }

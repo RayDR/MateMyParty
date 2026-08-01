@@ -338,6 +338,6 @@
   "bulkRegenerateTitle": "¿Regenerar las invitaciones seleccionadas?",
   "bulkActionDescription": "{eligible} de {selected} invitados seleccionados pueden recibir esta acción. Los invitados no elegibles se omitirán.",
   "editingGuest": "Editando invitado",
-  "originalGuestName": "Nombre original del invitado",
-  "guestStatusSummary": "Resumen del estado del invitado y la invitación"
+  "guestStatusSummary": "Resumen",
+  "lastSentAt": "Último envío: {date}"
 }
