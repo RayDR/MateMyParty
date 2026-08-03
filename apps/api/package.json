@@ -15,7 +15,7 @@
     "@matemyparty/contracts": "workspace:*",
     "@matemyparty/database": "workspace:*",
     "@matemyparty/i18n": "workspace:*",
-    "@nestjs/common": "11.1.6",
+    "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.6",
     "@nestjs/platform-fastify": "11.1.6",
     "drizzle-orm": "0.45.2",
