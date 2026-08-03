@@ -17,7 +17,7 @@
     "@matemyparty/i18n": "workspace:*",
     "@nestjs/common": "11.1.6",
     "@nestjs/core": "11.1.6",
-    "@nestjs/platform-fastify": "11.1.6",
+    "@nestjs/platform-fastify": "11.1.28",
     "drizzle-orm": "0.45.2",
     "fastify": "5.6.1",
     "nodemailer": "9.0.3",
